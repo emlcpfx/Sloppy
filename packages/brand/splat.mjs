@@ -58,126 +58,206 @@ const weightFor = (k) => ISO / (1 - 1 / (k * k)) ** 3;
 const rad = (deg) => (deg * Math.PI) / 180;
 
 /**
- * One thrown arm: a chain of circles from the core out to a droplet head.
+ * A tendril, spaced BY RADIUS rather than by a fixed link count.
  *
- * `taper` shrinks each link, and the final link gets `tipScale` back so the arm
- * ends in a head rather than a point - the single detail that reads as liquid
- * rather than as a star.
+ * The first version of this placed N links at even intervals and shrank each by
+ * a constant factor. Radius then falls geometrically while spacing stays
+ * constant, so past the third link the blobs can no longer reach each other and
+ * the arm shatters into a string of beads - a 40-unit tendril arriving as seven
+ * separate dots.
+ *
+ * Here the walk is `d += spacing * r` with r falling LINEARLY from base to tip.
+ * Overlap is constant along the whole arm, so a tendril stays connected however
+ * far it reaches, and it naturally gets finer near the tip because the steps get
+ * smaller. Detachment stops being an accident of the parameters and becomes a
+ * choice: `fling` places a droplet past a deliberate gap.
+ *
+ * `tipR` above ~0.6 narrows and then swells instead of tapering - that is a
+ * drip, with a heavy head hanging below a thin neck.
  */
 function arm(cx, cy, angleDeg, length, baseR, opts = {}) {
-  const { links = 4, taper = 0.78, tipScale = 1.5, curve = 0, start = 0.3 } = opts;
+  const {
+    tipR = 0.18,     // tip radius, as a fraction of the base
+    spacing = 1.15,  // centre-to-centre step, in units of the local radius
+    curve = 0,       // degrees of bend over the arm's length
+    start = 0.3,     // where the arm begins, as a fraction of its length
+    fling = 0,       // detached droplet beyond the tip, as a fraction of length
+    flingR = 0.45,   // its radius, as a fraction of the base
+  } = opts;
+
   const blobs = [];
-  for (let i = 1; i <= links; i++) {
-    const t = i / links;
-    // Curve bends the arm as it travels, so nothing looks compass-drawn.
+  const d0 = length * start;
+  let d = d0;
+
+  while (d <= length) {
+    const t = (d - d0) / Math.max(1e-6, length - d0);
+    const r = baseR * (1 - t * (1 - tipR));
     const a = rad(angleDeg + curve * t * t);
-    const d = length * (start + (1 - start) * t);
-    const isTip = i === links;
-    const r = baseR * taper ** i * (isTip ? tipScale : 1);
     blobs.push({ x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d, r });
+    d += spacing * r;
   }
+
+  if (fling > 0) {
+    const d2 = length * (1 + fling);
+    const a = rad(angleDeg + curve);
+    blobs.push({ x: cx + Math.cos(a) * d2, y: cy + Math.sin(a) * d2, r: baseR * flingR });
+  }
+
   return blobs;
 }
 
 /**
- * The mark, in a 0..100 box.
+ * A mark is four kinds of part, and each does a job the others cannot:
  *
- * Asymmetric on purpose: one dominant throw up-right with a heavy head, a long
- * low-left counterweight, and the rest short. Even spacing reads as a snowflake.
+ *   core        the mass. Several offset lobes - one circle reads as a dot.
+ *   rim         small blobs sitting ON the silhouette, with a TIGHT influence
+ *               radius of their own. These break up the arcs between arms, and
+ *               they are the single biggest reason this stopped reading as a
+ *               starfish. Without them the gaps between tendrils are clean
+ *               circular segments, which no thrown liquid has ever produced.
+ *   arms        tendrils, thin relative to the core and tapering hard. A
+ *               droplet head is a garnish on two or three, not a rule.
+ *   satellites  detached, with sizes varying several-fold. Evenly-sized dots
+ *               evenly spaced read as decoration rather than debris.
  */
-export function splatBlobs(seed = 20260808) {
-  const r = rng(seed);
-  const jitter = (amt) => (r() - 0.5) * 2 * amt;
+function buildSpec(spec, seed) {
+  const r = rng(seed ?? spec.seed);
+  const j = (amt) => (r() - 0.5) * 2 * amt;
+  const [cx, cy] = spec.centre;
 
-  const cx = 49;
-  const cy = 52;
+  const blobs = [{ x: cx, y: cy, r: spec.core.r }];
 
-  /** Core mass: one round blob is a dot, three offset lobes is a splat. */
-  const blobs = [
-    { x: cx, y: cy, r: 10 },
-    { x: cx + Math.cos(rad(-40)) * 7, y: cy + Math.sin(rad(-40)) * 7, r: 8.5 },
-    { x: cx + Math.cos(rad(150)) * 8, y: cy + Math.sin(rad(150)) * 8, r: 8 },
-  ];
+  for (const [angle, dist, radius] of spec.core.lobes) {
+    blobs.push({
+      x: cx + Math.cos(rad(angle)) * dist,
+      y: cy + Math.sin(rad(angle)) * dist,
+      r: radius,
+    });
+  }
 
-  /**
-   * Deliberately uneven: two long throws, three mid, two stubs. Seven arms of
-   * equal length is a snowflake, and the eye reads the regularity instantly.
-   */
-  // angle, length, base radius, options
-  const arms = [
-    [-78, 47, 8.6, { links: 4, tipScale: 1.7, curve: 12 }],   // dominant throw, up
-    [-24, 30, 7.0, { links: 3, tipScale: 1.4, curve: -14 }],  // mid, upper right
-    [34, 21, 6.2, { links: 3, tipScale: 1.3, curve: 12 }],    // stub, lower right
-    [88, 39, 7.4, { links: 4, tipScale: 1.45, curve: -10 }],  // mid, straight down
-    [143, 26, 6.4, { links: 3, tipScale: 1.45, curve: 14 }],  // stub, lower left
-    [179, 45, 8.2, { links: 4, tipScale: 1.6, curve: -11 }],  // long, left
-    [-136, 33, 6.8, { links: 3, tipScale: 1.5, curve: 10 }],  // mid, upper left
-  ];
+  for (const [angle, dist, radius] of spec.rim) {
+    blobs.push({
+      x: cx + Math.cos(rad(angle + j(4))) * dist,
+      y: cy + Math.sin(rad(angle + j(4))) * dist,
+      r: radius,
+      // Tight support: a lump on the edge, not an inflation of the whole mass.
+      k: spec.rimK ?? 1.45,
+    });
+  }
 
-  for (const [angle, length, baseR, opts] of arms) {
-    blobs.push(...arm(cx, cy, angle + jitter(3), length * (1 + jitter(0.05)), baseR, opts));
+  for (const [angle, length, baseR, opts] of spec.arms) {
+    blobs.push(...arm(cx, cy, angle + j(2.5), length, baseR, opts));
   }
 
   return blobs;
 }
+
+function satellitesOf(spec) {
+  const [cx, cy] = spec.centre;
+  return spec.satellites.map(([angle, dist, radius]) => ({
+    x: cx + Math.cos(rad(angle)) * dist,
+    y: cy + Math.sin(rad(angle)) * dist,
+    r: radius,
+  }));
+}
+
+/** Shared silhouette lumps. Irregular spacing on purpose. */
+const RIM = [
+  [-4, 23, 6], [34, 23, 5.2], [-70, 23, 6], [-118, 22, 5.4],
+  [-160, 23, 6], [196, 22, 5], [104, 22, 5.6], [148, 22, 5.4],
+];
+
+/**
+ * The mark.
+ *
+ * A heavy off-centre mass with a lumpy edge, one dominant tendril thrown up and
+ * right with a droplet flung clear of it, a second thrown left, and two short
+ * drips hanging off the bottom. Nothing is evenly spaced and no two arms are
+ * the same length - seven equal arms is a snowflake, and the eye reads that
+ * regularity instantly.
+ */
+const MARK = {
+  seed: 2277,
+  centre: [48, 49],
+  core: { r: 17, lobes: [[-38, 10, 13.5], [142, 11, 12.5], [66, 10, 11]] },
+  rim: RIM,
+  arms: [
+    [-72, 46, 8.0, { tipR: 0.2, curve: 14, fling: 0.2, flingR: 0.42 }],  // dominant throw
+    [-16, 36, 6.8, { tipR: 0.18, curve: -10 }],
+    [56, 30, 6.0, { tipR: 0.18, curve: 9 }],
+    [100, 38, 6.6, { tipR: 0.19, curve: -12, fling: 0.18, flingR: 0.3 }],
+    [176, 40, 7.2, { tipR: 0.2, curve: -8 }],                            // counterweight
+    [-134, 30, 6.0, { tipR: 0.18, curve: 7 }],
+  ],
+  /**
+   * Placed in the GAPS between arm tips, never near one.
+   *
+   * The first placement put a satellite almost exactly where the dominant
+   * arm's flung droplet lands. Two circles overlapping by a third of their
+   * radius does not read as debris - it reads as a mistake.
+   */
+  satellites: [[-104, 50, 4.4], [24, 52, 2.4], [-156, 45, 3.2], [126, 54, 1.6], [-40, 60, 1.8]],
+};
 
 /**
  * The small-size cut.
  *
- * At 16px the full mark loses its arms entirely - a 1px-wide tendril simply is
- * not there after rasterisation, and what survives is an anonymous green dot.
- * So the toolbar icon gets its own geometry: shorter, fatter arms, no far
- * satellites, and a heavier core. Same character, drawn for the size it will
- * actually be seen at, which is what an icon designer would do by hand anyway.
+ * At 16px a tendril one pixel wide simply is not there after rasterisation, and
+ * what survives of the full mark is an anonymous green dot. So the toolbar icon
+ * gets its own geometry from the same family: heavier core, fatter rim lumps,
+ * shorter and blunter arms, no far debris. Same character, drawn for the size
+ * it will actually be seen at - which is what an icon designer would do by hand.
  */
-export function splatBlobsCompact(seed = 20260808) {
-  const r = rng(seed);
-  const jitter = (amt) => (r() - 0.5) * 2 * amt;
-  const cx = 50;
-  const cy = 51;
+const COMPACT = {
+  seed: 1919,
+  centre: [49, 49],
+  core: { r: 18.5, lobes: [[-38, 10, 15], [142, 11, 14], [66, 10, 12]] },
+  rim: RIM.map(([a, d, r]) => [a, d + 2, r * 1.1]),
+  arms: [
+    [-72, 44, 9.0, { tipR: 0.24, curve: 13, fling: 0.2, flingR: 0.4 }],
+    [-14, 34, 7.6, { tipR: 0.22, curve: -10 }],
+    [58, 29, 6.8, { tipR: 0.22, curve: 9 }],
+    [98, 36, 7.4, { tipR: 0.23, curve: -11 }],
+    [176, 38, 8.0, { tipR: 0.24, curve: -8 }],
+    [-134, 29, 6.8, { tipR: 0.22, curve: 7 }],
+  ],
+  satellites: [[-58, 58, 4.8], [30, 49, 2.6], [-150, 47, 3.4]],
+};
 
-  // Smaller core than you would expect, and FATTER arms - the arms are what
-  // disappear first at 16px, so they get the mass the core gives up.
-  const blobs = [
-    { x: cx, y: cy, r: 9 },
-    { x: cx + Math.cos(rad(-40)) * 7, y: cy + Math.sin(rad(-40)) * 7, r: 8 },
-    { x: cx + Math.cos(rad(150)) * 8, y: cy + Math.sin(rad(150)) * 8, r: 7.4 },
-  ];
+export function splatBlobs(seed) {
+  return buildSpec(MARK, seed);
+}
 
-  const arms = [
-    [-78, 44.0, 9.5, { links: 3, taper: 0.84, tipScale: 1.55, curve: 10 }],
-    [-18, 33.0, 8.1, { links: 3, taper: 0.84, tipScale: 1.4, curve: -12 }],
-    [42, 27.5, 7.6, { links: 2, taper: 0.84, tipScale: 1.35, curve: 10 }],
-    [94, 38.5, 8.5, { links: 3, taper: 0.84, tipScale: 1.4, curve: -8 }],
-    [176, 41.8, 9.0, { links: 3, taper: 0.84, tipScale: 1.5, curve: -10 }],
-    [-138, 30.8, 7.6, { links: 2, taper: 0.84, tipScale: 1.4, curve: 8 }],
-  ];
-
-  for (const [angle, length, baseR, opts] of arms) {
-    blobs.push(...arm(cx, cy, angle + jitter(2), length, baseR, opts));
-  }
-  return blobs;
+export function splatBlobsCompact(seed) {
+  return buildSpec(COMPACT, seed);
 }
 
 /**
  * Detached droplets. Separate contours by construction - they sit outside every
- * influence radius, so the field is exactly zero between them and the core.
+ * influence radius, so the field is exactly zero between them and the mass.
  */
-export function splatSatellites(seed = 20260808) {
-  const r = rng(seed ^ 0x5eed);
-  const j = (a) => (r() - 0.5) * 2 * a;
-  return [
-    { x: 12.5 + j(1), y: 17.5 + j(1), r: 5.4 },   // flung up-left
-    { x: 20.0 + j(1), y: 8.0 + j(1), r: 2.6 },    // its trailing speck
-    { x: 88.0 + j(1), y: 84.5 + j(1), r: 4.6 },   // opposite corner, balance
-    { x: 78.5 + j(1), y: 15.0 + j(1), r: 3.0 },
-  ];
+export function splatSatellites() {
+  return satellitesOf(MARK);
 }
 
-/** Compact-support field: sums to >= ISO inside the shape, exactly 0 far away. */
+export function splatSatellitesCompact() {
+  return satellitesOf(COMPACT);
+}
+
+/**
+ * Compact-support field: sums to >= ISO inside the shape, exactly 0 far away.
+ *
+ * Each blob may carry its own `k`, which is what lets one mark hold two scales
+ * of detail at once. A low k keeps a blob's influence tight so it reads as a
+ * distinct lump ON the silhouette; the default k lets the big masses flow into
+ * each other. With a single global k you get to pick one or the other, and the
+ * result is either a smooth amoeba or a string of beads.
+ */
 export function makeField(blobs) {
-  const w = weightFor(K);
-  const prepared = blobs.map((b) => ({ ...b, R2: (b.r * K) ** 2 }));
+  const prepared = blobs.map((b) => {
+    const k = b.k ?? K;
+    return { ...b, R2: (b.r * k) ** 2, w: weightFor(k) };
+  });
   return (x, y) => {
     let sum = 0;
     for (const b of prepared) {
@@ -186,7 +266,7 @@ export function makeField(blobs) {
       const d2 = dx * dx + dy * dy;
       if (d2 >= b.R2) continue;
       const t = 1 - d2 / b.R2;
-      sum += w * t * t * t;
+      sum += b.w * t * t * t;
     }
     return sum;
   };
@@ -198,7 +278,7 @@ export function fieldBounds(blobs, pad = 1) {
   let x1 = -Infinity;
   let y1 = -Infinity;
   for (const b of blobs) {
-    const R = b.r * K;
+    const R = b.r * (b.k ?? K);
     x0 = Math.min(x0, b.x - R);
     y0 = Math.min(y0, b.y - R);
     x1 = Math.max(x1, b.x + R);

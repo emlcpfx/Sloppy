@@ -35,7 +35,9 @@ const EXTENSION_ICONS = join(HERE, '..', '..', 'apps', 'extension', 'public', 'i
 export const PALETTE = {
   light: '#B4F25A',
   mid: '#5FCB37',
-  deep: '#31933A',
+  // Not very dark. An earlier deep stop turned the drips and the far tendrils
+  // near-black, which made the mark read as airbrushed rather than as a graphic.
+  deep: '#3AA83C',
   shadow: '#1B6B2A',
   flat: '#4CAF34',
 };
@@ -60,14 +62,14 @@ function markSvg(main, drops, { size = 100, gloss = true } = {}) {
   const glossLayer = gloss
     ? `
     <ellipse cx="70" cy="84" rx="36" ry="26" fill="url(#pool)"/>
-    <ellipse cx="42" cy="33" rx="21" ry="13" fill="#ffffff" opacity="0.4" filter="url(#soft)" transform="rotate(-24 42 33)"/>`
+    <ellipse cx="40" cy="35" rx="17" ry="10" fill="#ffffff" opacity="0.26" filter="url(#soft)" transform="rotate(-24 40 35)"/>`
     : '';
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" role="img" aria-label="Sloppy">
   <defs>
-    <radialGradient id="body" gradientUnits="userSpaceOnUse" cx="42" cy="36" r="66">
+    <radialGradient id="body" gradientUnits="userSpaceOnUse" cx="42" cy="36" r="72">
       <stop offset="0%" stop-color="${PALETTE.light}"/>
-      <stop offset="42%" stop-color="${PALETTE.mid}"/>
+      <stop offset="52%" stop-color="${PALETTE.mid}"/>
       <stop offset="100%" stop-color="${PALETTE.deep}"/>
     </radialGradient>
     <linearGradient id="drop" x1="0" y1="0" x2="0.4" y2="1">
