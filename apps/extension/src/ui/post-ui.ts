@@ -6,16 +6,23 @@
  * on, the SiteAdapter interface is missing a method.
  */
 
-import { SPLAT_PATH, SPLAT_VIEWBOX } from '@sloppy/brand/path';
+import { SPLAT_PATH, SPLAT_PATH_COMPACT, SPLAT_VIEWBOX } from '@sloppy/brand/path';
 import { normalizeTag, tagsForSite, type SiteId, type Verdict } from '@sloppy/core';
 import { clear, h, makeShadowHost, svg, type Props } from './dom.ts';
 import { SHADOW_CSS } from './styles.ts';
+
+/**
+ * Below this the thin arms and the flung satellites stop resolving and the mark
+ * reads as a smudge, so the chunkier cut is used instead. Same threshold the
+ * icon set uses.
+ */
+const COMPACT_BELOW = 26;
 
 export function splatIcon(size = 19): SVGElement {
   return svg(
     'svg',
     { viewBox: SPLAT_VIEWBOX, width: String(size), height: String(size), 'aria-hidden': 'true' },
-    svg('path', { d: SPLAT_PATH, fill: 'currentColor' }),
+    svg('path', { d: size < COMPACT_BELOW ? SPLAT_PATH_COMPACT : SPLAT_PATH, fill: 'currentColor' }),
   );
 }
 
