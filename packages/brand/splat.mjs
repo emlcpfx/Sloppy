@@ -78,6 +78,7 @@ const rad = (deg) => (deg * Math.PI) / 180;
 function arm(cx, cy, angleDeg, length, baseR, opts = {}) {
   const {
     tipR = 0.18,     // tip radius, as a fraction of the base
+    waist = 0,       // mid-arm pinch, 0..0.5
     spacing = 1.15,  // centre-to-centre step, in units of the local radius
     curve = 0,       // degrees of bend over the arm's length
     start = 0.3,     // where the arm begins, as a fraction of its length
@@ -91,7 +92,10 @@ function arm(cx, cy, angleDeg, length, baseR, opts = {}) {
 
   while (d <= length) {
     const t = (d - d0) / Math.max(1e-6, length - d0);
-    const r = baseR * (1 - t * (1 - tipR));
+    // Widest at the base, pinched through the middle, swelling to a rounded
+    // club at the tip. That waisted profile is what a thrown-liquid finger
+    // actually does, and it is the difference between a splat and a starburst.
+    const r = baseR * (1 - t * (1 - tipR)) * (1 - waist * Math.sin(Math.PI * t));
     const a = rad(angleDeg + curve * t * t);
     blobs.push({ x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d, r });
     d += spacing * r;
@@ -161,67 +165,86 @@ function satellitesOf(spec) {
   }));
 }
 
-/** Shared silhouette lumps. Irregular spacing on purpose. */
+/**
+ * Silhouette lumps. Small and pulled in close on purpose.
+ *
+ * An earlier set was larger and further out, and it filled the gaps BETWEEN
+ * the fingers - which is what a splat's negative space is made of. Big rim
+ * lumps give you a continuously bumpy amoeba; small ones let each finger read
+ * as a separate projection with a deep notch either side.
+ */
 const RIM = [
-  [-4, 23, 6], [34, 23, 5.2], [-70, 23, 6], [-118, 22, 5.4],
-  [-160, 23, 6], [196, 22, 5], [104, 22, 5.6], [148, 22, 5.4],
+  [-4, 20, 4.4], [34, 20, 4.0], [-70, 20, 4.4], [-118, 19, 4.2],
+  [-160, 20, 4.4], [196, 19, 3.8], [104, 19, 4.2], [148, 19, 4.0],
 ];
+
+/** Shared arm profiles. A finger tapers slightly; a drip narrows then hangs. */
+const FINGER = { waist: 0.3, spacing: 1.0 };
+const DRIP = { waist: 0.36, spacing: 1.0 };
 
 /**
  * The mark.
  *
- * A heavy off-centre mass with a lumpy edge, one dominant tendril thrown up and
- * right with a droplet flung clear of it, a second thrown left, and two short
- * drips hanging off the bottom. Nothing is evenly spaced and no two arms are
- * the same length - seven equal arms is a snowflake, and the eye reads that
- * regularity instantly.
+ * A solid lumpy mass with five fat fingers thrown out of it and two drips
+ * hanging off the bottom, plus three pieces of debris. Every finger is waisted
+ * and ends in a rounded club, which is the classic splat idiom and is what the
+ * reference material actually looks like - thin tapering tendrils read as a
+ * starburst or a spider, not as thrown paint.
+ *
+ * Nothing is evenly spaced and no two fingers are the same length. Seven equal
+ * arms is a snowflake, and the eye catches that regularity instantly.
  */
 const MARK = {
-  seed: 2277,
-  centre: [48, 49],
-  core: { r: 17, lobes: [[-38, 10, 13.5], [142, 11, 12.5], [66, 10, 11]] },
+  seed: 5512,
+  centre: [49, 45],
+  core: { r: 14.5, lobes: [[-38, 9, 12], [142, 10, 11], [66, 9, 10]] },
   rim: RIM,
   arms: [
-    [-72, 46, 8.0, { tipR: 0.2, curve: 14, fling: 0.2, flingR: 0.42 }],  // dominant throw
-    [-16, 36, 6.8, { tipR: 0.18, curve: -10 }],
-    [56, 30, 6.0, { tipR: 0.18, curve: 9 }],
-    [100, 38, 6.6, { tipR: 0.19, curve: -12, fling: 0.18, flingR: 0.3 }],
-    [176, 40, 7.2, { tipR: 0.2, curve: -8 }],                            // counterweight
-    [-134, 30, 6.0, { tipR: 0.18, curve: 7 }],
+    [-74, 50, 7.4, { ...FINGER, tipR: 0.8, curve: 8 }],   // dominant, up
+    [-20, 40, 6.6, { ...FINGER, tipR: 0.76, curve: -9 }],
+    [34, 33, 6.0, { ...FINGER, tipR: 0.78, curve: 8 }],
+    [84, 50, 5.6, { ...DRIP, tipR: 0.95, curve: 4 }],     // long drip
+    [110, 37, 4.8, { ...DRIP, tipR: 0.9, curve: -5 }],    // short drip
+    [178, 47, 7.0, { ...FINGER, tipR: 0.8, curve: -8 }],  // counterweight, left
+    [-132, 36, 6.2, { ...FINGER, tipR: 0.76, curve: 7 }],
   ],
   /**
-   * Placed in the GAPS between arm tips, never near one.
+   * Three, and placed in the GAPS between finger tips.
    *
-   * The first placement put a satellite almost exactly where the dominant
-   * arm's flung droplet lands. Two circles overlapping by a third of their
-   * radius does not read as debris - it reads as a mistake.
+   * An earlier version had five and put one almost exactly where a finger's
+   * flung droplet landed. Two circles overlapping by a third of their radius
+   * does not read as debris; it reads as a mistake.
    */
-  satellites: [[-104, 50, 4.4], [24, 52, 2.4], [-156, 45, 3.2], [126, 54, 1.6], [-40, 60, 1.8]],
+  satellites: [[-104, 48, 4.0], [22, 49, 2.5], [146, 48, 2.9]],
 };
 
 /**
  * The small-size cut.
  *
- * At 16px a tendril one pixel wide simply is not there after rasterisation, and
- * what survives of the full mark is an anonymous green dot. So the toolbar icon
- * gets its own geometry from the same family: heavier core, fatter rim lumps,
- * shorter and blunter arms, no far debris. Same character, drawn for the size
- * it will actually be seen at - which is what an icon designer would do by hand.
+ * At 16px a finger two pixels wide is gone after rasterisation and what
+ * survives of the full mark is an anonymous green dot. So the toolbar icon gets
+ * its own geometry from the same family: heavier core, shorter and fatter
+ * fingers, drips shortened so they do not become a stray pixel. Same character,
+ * drawn for the size it will actually be seen at - which is what an icon
+ * designer would do by hand anyway.
  */
 const COMPACT = {
   seed: 1919,
-  centre: [49, 49],
-  core: { r: 18.5, lobes: [[-38, 10, 15], [142, 11, 14], [66, 10, 12]] },
-  rim: RIM.map(([a, d, r]) => [a, d + 2, r * 1.1]),
+  centre: [49, 46],
+  core: { r: 15, lobes: [[-38, 9, 12.5], [142, 10, 11.5], [66, 9, 10.5]] },
+  // Only slightly fatter than the mark's. Pushed further and the lumps close
+  // the notches between fingers, and the icon goes back to being an amoeba.
+  rim: RIM.map(([a, d, r]) => [a, d + 1, r * 1.1]),
   arms: [
-    [-72, 44, 9.0, { tipR: 0.24, curve: 13, fling: 0.2, flingR: 0.4 }],
-    [-14, 34, 7.6, { tipR: 0.22, curve: -10 }],
-    [58, 29, 6.8, { tipR: 0.22, curve: 9 }],
-    [98, 36, 7.4, { tipR: 0.23, curve: -11 }],
-    [176, 38, 8.0, { tipR: 0.24, curve: -8 }],
-    [-134, 29, 6.8, { tipR: 0.22, curve: 7 }],
+    [-74, 46, 8.2, { ...FINGER, tipR: 0.84, curve: 8 }],
+    [-20, 38, 7.4, { ...FINGER, tipR: 0.8, curve: -9 }],
+    [34, 32, 6.6, { ...FINGER, tipR: 0.82, curve: 8 }],
+    [84, 46, 6.2, { ...DRIP, tipR: 0.95, curve: 4 }],
+    [112, 34, 5.4, { ...DRIP, tipR: 0.9, curve: -5 }],
+    [178, 43, 7.8, { ...FINGER, tipR: 0.84, curve: -8 }],
+    [-132, 34, 6.8, { ...FINGER, tipR: 0.8, curve: 7 }],
   ],
-  satellites: [[-58, 58, 4.8], [30, 49, 2.6], [-150, 47, 3.4]],
+  satellites: [[-104, 46, 4.4], [24, 47, 2.8], [146, 46, 3.2]],
 };
 
 export function splatBlobs(seed) {

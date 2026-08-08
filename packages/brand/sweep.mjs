@@ -38,6 +38,7 @@ const OUT = process.argv[2] ?? '/tmp/splat_sweep.png';
 function arm(cx, cy, angleDeg, length, baseR, opts = {}) {
   const {
     tipR = 0.18,      // tip radius as a fraction of the base
+    waist = 0,        // mid-arm pinch, 0..0.5
     spacing = 1.15,   // centre-to-centre step, in units of the local radius
     curve = 0,
     start = 0.3,
@@ -51,7 +52,10 @@ function arm(cx, cy, angleDeg, length, baseR, opts = {}) {
 
   while (d <= length) {
     const t = (d - d0) / Math.max(1e-6, length - d0);
-    const r = baseR * (1 - t * (1 - tipR));
+    // Widest at the base, pinched through the middle, swelling to a rounded
+    // club at the tip. That waisted profile is what makes a splat finger read
+    // as thrown liquid instead of as a cone or a sausage.
+    const r = baseR * (1 - t * (1 - tipR)) * (1 - waist * Math.sin(Math.PI * t));
     const a = rad(angleDeg + curve * t * t);
     blobs.push({ x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d, r });
     d += spacing * r;
@@ -109,90 +113,86 @@ function build(spec) {
 // ---------------------------------------------------------------------------
 
 /**
- * Round 4. 'Bold' had the mass and the small-size legibility; 'goo' had the
- * character. These four cross the two.
+ * Round 6. K2 had the idiom; the gaps between fingers were too shallow because
+ * the rim lumps were filling them in. Smaller rim, longer fingers.
  */
 
+/** Rim lumps: smaller and closer in, so the gaps between fingers stay deep. */
 const RIM = [
-  [-4, 23, 6], [34, 23, 5.2], [-70, 23, 6], [-118, 22, 5.4],
-  [-160, 23, 6], [196, 22, 5], [104, 22, 5.6], [148, 22, 5.4],
+  [-4, 20, 4.4], [34, 20, 4.0], [-70, 20, 4.4], [-118, 19, 4.2],
+  [-160, 20, 4.4], [196, 19, 3.8], [104, 19, 4.2], [148, 19, 4.0],
 ];
 
-/** J1: bold, with the flung droplets knocked off-axis. */
-const J1 = {
-  seed: 2277,
-  centre: [48, 49],
-  core: { r: 17, lobes: [[-38, 10, 13.5], [142, 11, 12.5], [66, 10, 11]] },
+const FINGER = { waist: 0.30, spacing: 1.0 };
+const DRIP = { waist: 0.36, spacing: 1.0 };
+
+/** L1: fingers +18%, rim pulled back. */
+const L1 = {
+  seed: 5512,
+  centre: [49, 45],
+  core: { r: 14.5, lobes: [[-38, 9, 12], [142, 10, 11], [66, 9, 10]] },
   rim: RIM,
   arms: [
-    [-72, 46, 8.0, { tipR: 0.2, curve: 14, fling: 0.2, flingR: 0.42 }],
-    [-16, 36, 6.8, { tipR: 0.18, curve: -10 }],
-    [56, 30, 6.0, { tipR: 0.18, curve: 9 }],
-    [100, 38, 6.6, { tipR: 0.19, curve: -12, fling: 0.18, flingR: 0.3 }],
-    [176, 40, 7.2, { tipR: 0.2, curve: -8 }],
-    [-134, 30, 6.0, { tipR: 0.18, curve: 7 }],
+    [-74, 50, 7.4, { ...FINGER, tipR: 0.80, curve: 8 }],
+    [-20, 40, 6.6, { ...FINGER, tipR: 0.76, curve: -9 }],
+    [34, 33, 6.0, { ...FINGER, tipR: 0.78, curve: 8 }],
+    [84, 50, 5.6, { ...DRIP, tipR: 0.95, curve: 4 }],
+    [110, 37, 4.8, { ...DRIP, tipR: 0.90, curve: -5 }],
+    [178, 47, 7.0, { ...FINGER, tipR: 0.80, curve: -8 }],
+    [-132, 36, 6.2, { ...FINGER, tipR: 0.76, curve: 7 }],
   ],
-  satellites: [[-58, 60, 4.6], [30, 49, 2.4], [-150, 47, 3.4], [136, 52, 1.7]],
+  satellites: [[-104, 48, 4.0], [22, 49, 2.5], [146, 48, 2.9]],
 };
 
-/** J2: bold mass, goo behaviour - two hanging drips along the bottom. */
-const J2 = {
-  seed: 4488,
-  centre: [48, 45],
-  core: { r: 16.5, lobes: [[-38, 10, 13], [142, 11, 12], [66, 10, 10.5]] },
-  rim: RIM,
+/** L2: further again, and a leaner mass. */
+const L2 = {
+  ...L1,
+  seed: 6620,
+  core: { r: 13.5, lobes: [[-38, 9, 11], [142, 10, 10], [66, 9, 9]] },
+  rim: RIM.map(([a, d, r]) => [a, d - 1, r * 0.9]),
   arms: [
-    [-70, 46, 7.8, { tipR: 0.2, curve: 13, fling: 0.2, flingR: 0.42 }],
-    [-14, 34, 6.6, { tipR: 0.18, curve: -10 }],
-    [60, 26, 5.6, { tipR: 0.18, curve: 9 }],
-    // Drips: narrow, then swell.
-    [86, 36, 5.6, { tipR: 0.85, spacing: 1.0, curve: 4 }],
-    [112, 27, 4.8, { tipR: 0.8, spacing: 1.0, curve: -5 }],
-    [176, 38, 7.0, { tipR: 0.2, curve: -8 }],
-    [-136, 28, 5.8, { tipR: 0.18, curve: 7 }],
-  ],
-  satellites: [[-58, 58, 4.4], [28, 48, 2.3], [-150, 46, 3.2], [96, 58, 1.6]],
-};
-
-/** J3: same, but the mass comes in and the tendrils go further. */
-const J3 = {
-  ...J2,
-  seed: 6611,
-  core: { r: 15, lobes: [[-38, 10, 12], [142, 11, 11], [66, 10, 9.5]] },
-  rim: RIM.map(([a, d, r]) => [a, d - 1.5, r * 0.92]),
-  arms: [
-    [-70, 54, 7.4, { tipR: 0.17, curve: 13, fling: 0.18, flingR: 0.42 }],
-    [-14, 40, 6.2, { tipR: 0.16, curve: -11 }],
-    [60, 30, 5.4, { tipR: 0.16, curve: 9 }],
-    [86, 42, 5.4, { tipR: 0.8, spacing: 1.0, curve: 4 }],
-    [114, 30, 4.6, { tipR: 0.75, spacing: 1.0, curve: -5 }],
-    [176, 44, 6.6, { tipR: 0.17, curve: -8, fling: 0.14, flingR: 0.3 }],
-    [-136, 32, 5.6, { tipR: 0.17, curve: 7 }],
+    [-74, 55, 7.2, { ...FINGER, tipR: 0.78, curve: 8 }],
+    [-20, 44, 6.4, { ...FINGER, tipR: 0.74, curve: -9 }],
+    [34, 36, 5.8, { ...FINGER, tipR: 0.76, curve: 8 }],
+    [84, 55, 5.4, { ...DRIP, tipR: 0.95, curve: 4 }],
+    [110, 40, 4.6, { ...DRIP, tipR: 0.90, curve: -5 }],
+    [178, 52, 6.8, { ...FINGER, tipR: 0.78, curve: -8 }],
+    [-132, 39, 6.0, { ...FINGER, tipR: 0.74, curve: 7 }],
   ],
 };
 
-/** J4: heaviest mass, shortest tendrils - the favicon-first cut. */
-const J4 = {
-  seed: 1919,
-  centre: [49, 49],
-  core: { r: 18.5, lobes: [[-38, 10, 15], [142, 11, 14], [66, 10, 12]] },
-  rim: RIM.map(([a, d, r]) => [a, d + 2, r * 1.1]),
+/** L3: L1 with an eighth finger, so no gap is wide enough to read as a bite. */
+const L3 = {
+  ...L1,
+  seed: 8801,
   arms: [
-    [-72, 44, 9.0, { tipR: 0.24, curve: 13, fling: 0.2, flingR: 0.4 }],
-    [-14, 34, 7.6, { tipR: 0.22, curve: -10 }],
-    [58, 29, 6.8, { tipR: 0.22, curve: 9 }],
-    [98, 36, 7.4, { tipR: 0.23, curve: -11 }],
-    [176, 38, 8.0, { tipR: 0.24, curve: -8 }],
-    [-134, 29, 6.8, { tipR: 0.22, curve: 7 }],
+    ...L1.arms,
+    [-46, 40, 5.4, { ...FINGER, tipR: 0.74, curve: -6 }],
   ],
-  satellites: [[-58, 58, 4.8], [30, 49, 2.6], [-150, 47, 3.4]],
+};
+
+/** L4: L1 with a directional bias - longer up-right, stubbier down-left. */
+const L4 = {
+  ...L1,
+  seed: 3390,
+  centre: [47, 47],
+  arms: [
+    [-70, 56, 7.6, { ...FINGER, tipR: 0.82, curve: 9 }],
+    [-24, 46, 6.8, { ...FINGER, tipR: 0.78, curve: -9 }],
+    [30, 34, 5.8, { ...FINGER, tipR: 0.76, curve: 8 }],
+    [84, 48, 5.6, { ...DRIP, tipR: 0.95, curve: 4 }],
+    [112, 34, 4.8, { ...DRIP, tipR: 0.90, curve: -5 }],
+    [176, 42, 6.6, { ...FINGER, tipR: 0.78, curve: -8 }],
+    [-134, 33, 5.8, { ...FINGER, tipR: 0.74, curve: 7 }],
+  ],
+  satellites: [[-100, 50, 4.2], [20, 48, 2.4], [150, 46, 2.8]],
 };
 
 const VARIANTS = [
-  ['J1 · bold, off-axis flings', J1],
-  ['J2 · bold + drips', J2],
-  ['J3 · leaner mass, longer reach', J3],
-  ['J4 · favicon-first', J4],
+  ['L1 · fingers +18%', L1],
+  ['L2 · leaner mass, longer', L2],
+  ['L3 · eight fingers', L3],
+  ['L4 · directional', L4],
 ];
 
 // ---------------------------------------------------------------------------
