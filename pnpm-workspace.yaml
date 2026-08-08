@@ -1,0 +1,10 @@
+packages:
+  - 'packages/*'
+  - 'apps/*'
+
+# pnpm 10 blocks postinstall scripts unless a package is listed here.
+# These are the bundler binaries WXT needs to actually build.
+onlyBuiltDependencies:
+  - esbuild
+  - rollup
+  - workerd

@@ -1,0 +1,12 @@
+node_modules/
+.output/
+.wxt/
+dist/
+*.zip
+*.tsbuildinfo
+.DS_Store
+.env
+.env.local
+.dev.vars
+.wrangler/
+apps/safari/

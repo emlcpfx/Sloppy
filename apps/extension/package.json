@@ -1,0 +1,31 @@
+{
+  "name": "@sloppy/extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The Sloppy browser extension. The only package that knows a browser exists.",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "build:edge": "wxt build -b edge",
+    "build:safari": "wxt build -b safari",
+    "build:all": "wxt build && wxt build -b firefox && wxt build -b edge",
+    "zip": "wxt zip && wxt zip -b firefox",
+    "postinstall": "wxt prepare",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:e2e": "wxt build && node --test e2e/*.test.mjs"
+  },
+  "dependencies": {
+    "@sloppy/adapters": "workspace:*",
+    "@sloppy/brand": "workspace:*",
+    "@sloppy/core": "workspace:*",
+    "@sloppy/ruleset": "workspace:*",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "wxt": "^0.21.3"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "@sloppy/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker + D1. Three routes and a cron.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute sloppy --file=./schema.sql",
+    "db:init:local": "wrangler d1 execute sloppy --local --file=./schema.sql",
+    "test": "node --test src/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@sloppy/core": "workspace:*",
+    "@sloppy/ruleset": "workspace:*",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260801.1",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.51.0"
+  }
+}

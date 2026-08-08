@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+# One version number, every target, built from one tag push. WXT handles the
+# manifest translation between them and emits the source bundle AMO requires.
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check before shipping
+        run: pnpm run check
+
+      # `zip` also produces the sources archive AMO requires for review.
+      - name: Package
+        run: pnpm --filter @sloppy/extension zip
+
+      - name: Build Edge
+        run: pnpm --filter @sloppy/extension build:edge
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sloppy-${{ github.ref_name }}
+          path: apps/extension/.output/*.zip
+          if-no-files-found: error
+
+      - name: Draft the release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: apps/extension/.output/*.zip
+          body: |
+            Built from `${{ github.sha }}`.
+
+            Store submissions are still manual on purpose — each one needs its
+            data-collection disclosure checked against what this build actually
+            sends. See `docs/PRIVACY.md`.

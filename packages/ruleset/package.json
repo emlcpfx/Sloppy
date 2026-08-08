@@ -1,0 +1,23 @@
+{
+  "name": "@sloppy/ruleset",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The shipped ruleset, and the CI gate that decides what is allowed into it.",
+  "exports": {
+    ".": "./validate.ts",
+    "./rules.json": "./rules.json"
+  },
+  "scripts": {
+    "validate": "node validate.ts rules.json",
+    "test": "node --test validate.test.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@sloppy/core": "workspace:*",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

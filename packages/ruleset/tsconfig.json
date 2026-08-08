@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "paths": {
+      "@sloppy/core": ["../core/src/index.ts"],
+      "@sloppy/core/schema": ["../core/src/schema.ts"]
+    }
+  },
+  "include": ["*.ts"]
+}
