@@ -80,13 +80,15 @@ feed.
 ## Things worth knowing before you change something
 
 **The splat is generated, not drawn.** `packages/brand/splat.mjs` builds a
-metaball field — a core mass, seven thrown arms of shrinking circles ending in
-droplet heads, four detached satellites — and extracts the outline with marching
-squares. A radial `r(theta)` starburst cannot make a splat, because a real arm
-pinches at the neck and bulges at the tip, which is not a star-shaped polygon.
-Summed circle fields give you that fillet for free. Icons under 48px use a
-separate, chunkier cut: at 16px a thin arm rasterises away to nothing and what
-survives is an anonymous green dot.
+metaball field — a lumpy core, small tight lumps on the rim, five fat fingers,
+two drips and three droplets — and extracts the outline with marching squares.
+Three things make it read as liquid rather than as a starburst: fingers are
+**waisted** (widest at the base, pinched in the middle, swelling to a rounded
+club), links are spaced **by radius** so an arm stays connected however far it
+reaches, and the rim lumps are **small** so the notches between fingers stay
+deep. Icons under 48px use a separate, chunkier cut, because at 16px a thin
+finger rasterises away to nothing. `sweep.mjs` renders variants side by side at
+the sizes they actually ship at.
 
 **Read post ids at click time, never at injection time.** Both feeds virtualise
 and recycle DOM nodes, so the element you tagged thirty seconds ago may be a
