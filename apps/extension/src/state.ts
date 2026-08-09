@@ -19,7 +19,7 @@ import {
   type SnapshotPost,
   type TagEvent,
 } from '@sloppy/core';
-import { EMPTY_RULESET, type Ruleset } from '@sloppy/core';
+import { DEFAULT_STAMP_BITS, EMPTY_RULESET, type Ruleset } from '@sloppy/core';
 import { newInstallId, read, readSynced, write, writeSynced } from './browser.ts';
 
 export const KEYS = {
@@ -42,10 +42,20 @@ export interface Settings {
   syncEnabled: boolean;
   /** Minutes between snapshot pulls. The alarm floor is 1; the plan says daily. */
   syncIntervalMinutes: number;
+  /**
+   * Proof-of-work difficulty the server last asked for. Learned from the
+   * snapshot so it can be raised without a store update.
+   */
+  stampBits: number;
 }
 
 export function defaultSettings(): Settings {
-  return { apiBase: '', syncEnabled: false, syncIntervalMinutes: 60 * 24 };
+  return {
+    apiBase: '',
+    syncEnabled: false,
+    syncIntervalMinutes: 60 * 24,
+    stampBits: DEFAULT_STAMP_BITS,
+  };
 }
 
 export interface Stats {

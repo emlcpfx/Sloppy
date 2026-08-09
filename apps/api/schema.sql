@@ -26,8 +26,9 @@ CREATE INDEX IF NOT EXISTS idx_tags_install   ON tags (install_id, ts);
 -- and it is computable without the server ever holding the text.
 CREATE INDEX IF NOT EXISTS idx_tags_hash      ON tags (text_hash);
 
--- Rebuilt wholesale by the cron rollup. Never written to by a request.
-CREATE TABLE IF NOT EXISTS authors (
+-- Proposed by the nightly rollup, rebuilt wholesale each run. NOT served to
+-- anyone: crossing a threshold makes you a candidate, nothing more.
+CREATE TABLE IF NOT EXISTS author_candidates (
   author_id          TEXT    NOT NULL,
   site               TEXT    NOT NULL,
   kind               TEXT    NOT NULL DEFAULT 'unknown',
@@ -38,7 +39,43 @@ CREATE TABLE IF NOT EXISTS authors (
   PRIMARY KEY (author_id, site)
 );
 
+CREATE INDEX IF NOT EXISTS idx_candidates_site ON author_candidates (site);
+
+-- Approved authors. This is what the snapshot serves, and NOTHING writes to it
+-- automatically - a row appears here only because a person put it here.
+--
+-- Promoting an author hides everything they post for everyone subscribed to
+-- that tag. It is the one action in this system that can damage somebody's
+-- livelihood, and it does not happen because a counter crossed a threshold.
+CREATE TABLE IF NOT EXISTS authors (
+  author_id          TEXT    NOT NULL,
+  site               TEXT    NOT NULL,
+  kind               TEXT    NOT NULL DEFAULT 'unknown',
+  tag                TEXT    NOT NULL,
+  flagged_posts      INTEGER NOT NULL,
+  distinct_reporters INTEGER NOT NULL,
+  window_end         INTEGER NOT NULL,
+  approved_at        INTEGER,
+  approved_by        TEXT,
+  note               TEXT,
+  PRIMARY KEY (author_id, site)
+);
+
 CREATE INDEX IF NOT EXISTS idx_authors_site ON authors (site);
+
+-- Decisions, including rejections and appeals upheld. Sticky on purpose: a
+-- rejected candidate that reappeared every night would guarantee that somebody
+-- eventually approves it by accident, and an appeal that had to be re-argued
+-- every time the rollup ran would not be an appeal at all.
+CREATE TABLE IF NOT EXISTS author_decisions (
+  author_id  TEXT    NOT NULL,
+  site       TEXT    NOT NULL,
+  decision   TEXT    NOT NULL CHECK (decision IN ('approved', 'rejected')),
+  decided_at INTEGER NOT NULL,
+  decided_by TEXT,
+  note       TEXT,
+  PRIMARY KEY (author_id, site)
+);
 
 -- A custom tag stays private to the person who coined it until enough distinct
 -- installs have independently used it. Without this, one user inventing

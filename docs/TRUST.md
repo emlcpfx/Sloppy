@@ -1,10 +1,34 @@
-# The open question: anyone can write to the list
+# Writing to the shared list
 
-**Status: unresolved. This blocks P1 (sharing), not P0.**
+**Status: decided and implemented — proof-of-work on writes, plus human review
+before any account is added to the list. Options 2 and 4 below.**
 
-Sharing is off by default and there is no deployed server, so nothing here is
-currently exploitable. It needs deciding *before* a server exists, because the
-answer is architectural rather than a patch.
+What is implemented:
+
+| | |
+|---|---|
+| **Every tag carries a proof-of-work stamp** | `packages/core/src/stamp.ts`. Bound to the specific post, so it cannot be minted once and replayed. ~165ms per tag at the default 16 bits. Difficulty rides in the snapshot, so it can be raised without a store resubmission. |
+| **Author promotion is human-gated** | The nightly rollup writes to `author_candidates`, which is served to nobody. An operator reviews and decides with `pnpm --filter @sloppy/api authors pending`. |
+| **Rejections are sticky** | `author_decisions` keeps them, so a cleared account cannot resurface every night until somebody approves it by accident. |
+| **There is an appeal route** | [APPEALS.md](APPEALS.md). Upholding an appeal is one command and it is permanent. |
+
+**What this does not do:** the stamp is not proof of humanity and does not stop
+somebody determined with a GPU. It converts "free" into "measurable", which is
+the step that matters at community scale — a script wanting ten thousand fake
+post-hides now needs roughly twenty minutes of a core instead of a few seconds.
+The part that could actually damage a person is not defended by arithmetic at
+all; it is defended by a person looking at it.
+
+The reasoning that led there is kept below, because the rejected options are
+the useful part if this ever needs revisiting.
+
+---
+
+## The original problem
+
+Sharing is off by default and there was no deployed server, so none of this was
+ever exploitable in the field. It needed deciding *before* a server existed,
+because the answer is architectural rather than a patch.
 
 ## The problem
 
@@ -88,18 +112,27 @@ that has been tagging plausibly for months counts for more than one that
 appeared this morning. Real, but it is scale infrastructure, and a new
 deployment has no history to weight with.
 
-## What is worth doing
+## What was chosen: 4 + 2
 
-Probably **4 + 2**: automatic post hides with a Turnstile stamp, and author
-promotion gated on a human. That keeps the product's premise, keeps writes
-anonymous, and puts a person in front of the only decision that can damage
-someone.
+Automatic post hides with a cost attached, and author promotion gated on a
+human. That keeps the product's premise, keeps writes anonymous, and puts a
+person in front of the only decision that can damage someone.
 
-**Whatever is chosen, one thing should ship with it:** an appeal route. If a
-name lands on the author list, they need somewhere to say so, and it needs to
-be findable by someone who has just discovered their posts are being hidden and
-does not know why. A blocklist without an appeal is a reputation system with no
-right of reply.
+**Proof-of-work rather than Turnstile**, in the end. Turnstile was the original
+suggestion, and it is the stronger control — but it needs a script from
+`challenges.cloudflare.com`, and MV3 extension pages forbid remote scripts, so
+it would have meant a Worker-hosted challenge page in an iframe, a site key, a
+secret, and a token-exchange endpoint. Proof-of-work has no third party, no
+keys, no new endpoint, works offline, and is fully testable. It is weaker per
+unit of attacker effort and stronger in every operational respect, which at this
+scale is the better trade. Turnstile remains the upgrade path if a real attacker
+turns up; the stamp header is versioned (`v1.`) so a second scheme can be added
+without breaking old clients.
+
+**Shipped alongside it:** an appeal route ([APPEALS.md](APPEALS.md)). If a name
+lands on the author list they need somewhere to say so, and it needs to be
+findable by someone who has just discovered their posts are being hidden and
+does not know why.
 
 ## Related and unfixed
 

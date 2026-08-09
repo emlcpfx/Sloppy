@@ -10,7 +10,8 @@
     "db:init": "wrangler d1 execute sloppy --file=./schema.sql",
     "db:init:local": "wrangler d1 execute sloppy --local --file=./schema.sql",
     "test": "node --test src/*.test.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "authors": "node scripts/authors.mjs"
   },
   "dependencies": {
     "@sloppy/core": "workspace:*",

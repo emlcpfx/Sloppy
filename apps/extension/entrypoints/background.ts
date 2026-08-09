@@ -11,7 +11,7 @@ import { defineBackground } from 'wxt/utils/define-background';
 import { SITE_IDS, type SiteId, type TagEvent } from '@sloppy/core';
 import { alarms, onMessage, read, runtime, write } from '../src/browser.ts';
 import { fetchRuleset, fetchSnapshot, postTag } from '../src/api.ts';
-import { KEYS, installId, loadSettings, saveRuleset, saveSnapshot } from '../src/state.ts';
+import { KEYS, installId, loadSettings, saveRuleset, saveSettings, saveSnapshot } from '../src/state.ts';
 
 const ALARM = 'sloppy:sync';
 
@@ -91,14 +91,23 @@ async function syncAll(): Promise<{ ok: boolean; reason?: string; sites?: number
   if (!settings.syncEnabled || !settings.apiBase) return { ok: true, reason: 'local-only' };
 
   let synced = 0;
+  let stampBits = settings.stampBits;
+
   for (const site of SITE_IDS) {
     try {
-      await saveSnapshot(site, await fetchSnapshot(settings.apiBase, site));
+      const snapshot = await fetchSnapshot(settings.apiBase, site);
+      await saveSnapshot(site, snapshot);
+      if (snapshot.stampBits) stampBits = snapshot.stampBits;
       synced++;
     } catch (err) {
       console.warn(`[sloppy] snapshot sync failed for ${site}`, err);
     }
   }
+
+  // Difficulty rides along in the snapshot so it can be raised without a store
+  // resubmission. The schema bounds it, so a hostile value cannot make the
+  // miner run for a week.
+  if (stampBits !== settings.stampBits) await saveSettings({ ...settings, stampBits });
 
   try {
     // Already sanitised by fetchRuleset - only features that passed the same
@@ -148,7 +157,7 @@ async function drain(): Promise<void> {
 
     for (const item of queue) {
       try {
-        await postTag(settings.apiBase, id, item.event);
+        await postTag(settings.apiBase, id, item.event, settings.stampBits);
       } catch {
         const tries = item.tries + 1;
         if (tries < MAX_TRIES) remaining.push({ ...item, tries });

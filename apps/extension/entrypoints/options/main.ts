@@ -212,6 +212,11 @@ async function render(): Promise<void> {
         style: { marginTop: '12px', marginBottom: '0' },
         text: 'Every "show anyway" is recorded on this device as a note that a hide was wrong. It is never uploaded.',
       }),
+      h('p', {
+        class: 'note',
+        style: { marginTop: '8px', marginBottom: '0' },
+        text: 'Accounts are only ever added to the shared repeat-poster list after a person reviews them, and anyone on it can ask to be removed. Individual posts you tag are yours alone unless sharing is on.',
+      }),
     ),
 
     h(

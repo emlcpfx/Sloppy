@@ -11,7 +11,16 @@
  * all and the free tier goes a very long way.
  */
 
-import { CANONICAL_TAGS, normalizeTag, SITE_IDS, type SiteId, type Snapshot } from '@sloppy/core';
+import {
+  CANONICAL_TAGS,
+  DEFAULT_STAMP_BITS,
+  MAX_STAMP_BITS,
+  normalizeTag,
+  SITE_IDS,
+  verifyStamp,
+  type SiteId,
+  type Snapshot,
+} from '@sloppy/core';
 import { zRuleset, zTagRequest } from '@sloppy/core/schema';
 import RULES from '@sloppy/ruleset/rules.json' with { type: 'json' };
 import { DEFAULT_ROLLUP, promotableTags, rollupAuthors, rollupPosts, type TagRow } from './rollup.ts';
@@ -20,6 +29,19 @@ export interface Env {
   DB: D1Database;
   /** Optional: a comma-separated allowlist. Empty means any origin. */
   ALLOWED_ORIGINS?: string;
+  /** Proof-of-work difficulty required on writes. Raise it if abused. */
+  STAMP_BITS?: string;
+}
+
+/**
+ * Difficulty required on writes, advertised in the snapshot so clients can pick
+ * up a change without a store resubmission. Clamped, because a typo here would
+ * otherwise either disable the defence or make tagging impossible.
+ */
+function requiredStampBits(env: Env): number {
+  const configured = Number(env.STAMP_BITS ?? '');
+  if (!Number.isInteger(configured) || configured < 1) return DEFAULT_STAMP_BITS;
+  return Math.min(configured, MAX_STAMP_BITS);
 }
 
 /** Matches the snapshot's own freshness. A stale-by-15-minutes list is fine. */
@@ -63,6 +85,27 @@ async function handleTag(request: Request, env: Env): Promise<Response> {
     return json({ error: 'invalid tag', detail: parsed.error.issues[0]?.message }, request, env, 400);
   }
   const t = parsed.data;
+
+  /**
+   * PROOF OF WORK FIRST, before touching the database.
+   *
+   * `installId` is a UUID the client picks, so the rate limit below constrains
+   * honest clients and nobody else - minting a new UUID resets it. The stamp is
+   * what makes a report cost something, and it is bound to this specific post
+   * so it cannot be minted once and replayed across thousands of targets.
+   *
+   * Checked before the rate-limit query so that unstamped junk costs us a hash
+   * rather than a D1 read. See docs/TRUST.md.
+   */
+  const stampBits = requiredStampBits(env);
+  const failure = verifyStamp(
+    request.headers.get('x-sloppy-stamp') ?? '',
+    { installId: t.installId, site: t.site, postId: t.postId },
+    stampBits,
+  );
+  if (failure) {
+    return json({ error: 'invalid stamp', reason: failure, stampBits }, request, env, 400);
+  }
 
   if (await overRateLimit(env, t.installId)) {
     return json({ error: 'rate limited' }, request, env, 429);
@@ -112,9 +155,18 @@ async function handleSnapshot(url: URL, env: Env): Promise<Response> {
   const rows = results ?? [];
   const publicTags = new Set([...CANONICAL_TAGS, ...promotableTags(rows, CANONICAL_TAGS)]);
 
+  /**
+   * `authors` now contains ONLY entries a human approved.
+   *
+   * The cron writes candidates to `author_candidates` and never to this table.
+   * Promoting an author hides everything they post for everyone subscribed to
+   * that tag, which is the one thing in this system that can damage a person's
+   * livelihood - so it does not happen because a counter crossed a threshold.
+   * See docs/TRUST.md and docs/APPEALS.md.
+   */
   const authorRows = await env.DB.prepare(
     `SELECT author_id AS id, kind, tag, flagged_posts AS flaggedPosts, distinct_reporters AS reporters
-       FROM authors WHERE site = ?`,
+       FROM authors WHERE site = ? AND approved_at IS NOT NULL`,
   )
     .bind(site)
     .all<{ id: string; kind: string; tag: string; flaggedPosts: number; reporters: number }>();
@@ -123,6 +175,7 @@ async function handleSnapshot(url: URL, env: Env): Promise<Response> {
     site,
     generatedAt: Date.now(),
     rulesVersion: (RULES as { version: number }).version,
+    stampBits: requiredStampBits(env),
     // A coined tag stays private to its author until enough installs use it.
     posts: rollupPosts(rows).filter((p) => publicTags.has(p.tag)),
     authors: (authorRows.results ?? []).map((a) => ({
@@ -170,8 +223,22 @@ function handleRuleset(request: Request, env: Env): Response {
 // Cron
 // ---------------------------------------------------------------------------
 
+/**
+ * The cron proposes. A human disposes.
+ *
+ * This used to write straight into `authors`, which is the table the snapshot
+ * serves - so crossing 5 posts from 2 reporters silenced somebody automatically.
+ * With writes unauthenticated that was ten HTTP requests and two UUIDs; even
+ * with the proof-of-work stamp it is minutes of CPU, which is not a bar worth
+ * putting somebody's livelihood behind.
+ *
+ * So the rollup now only ever writes CANDIDATES. An operator reviews them with
+ * `pnpm --filter @sloppy/api authors pending` and approves or rejects. Rejections
+ * are remembered, or the same name would resurface every single night.
+ */
 async function rebuildAuthors(env: Env): Promise<void> {
-  const cutoff = Date.now() - DEFAULT_ROLLUP.windowDays * 86_400_000;
+  const now = Date.now();
+  const cutoff = now - DEFAULT_ROLLUP.windowDays * 86_400_000;
 
   for (const site of SITE_IDS) {
     const { results } = await env.DB.prepare(
@@ -181,17 +248,26 @@ async function rebuildAuthors(env: Env): Promise<void> {
       .bind(site, cutoff)
       .all<TagRow>();
 
-    const promoted = rollupAuthors(results ?? [], DEFAULT_ROLLUP);
+    const candidates = rollupAuthors(results ?? [], DEFAULT_ROLLUP, now);
 
-    // Rebuild rather than upsert: an author who has aged out of the window must
-    // LEAVE the list, and an incremental update quietly never removes anybody.
+    // Rebuild the candidate list rather than upserting it: an author who has
+    // aged out of the window must LEAVE, and an incremental update quietly
+    // never removes anybody. Decisions live in their own table and survive.
     const statements = [
-      env.DB.prepare('DELETE FROM authors WHERE site = ?').bind(site),
-      ...promoted.map((a) =>
+      env.DB.prepare('DELETE FROM author_candidates WHERE site = ?').bind(site),
+      ...candidates.map((a) =>
         env.DB.prepare(
-          `INSERT INTO authors (author_id, site, kind, tag, flagged_posts, distinct_reporters, window_end)
+          `INSERT INTO author_candidates
+             (author_id, site, kind, tag, flagged_posts, distinct_reporters, window_end)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        ).bind(a.id, site, a.kind, a.tag, a.flaggedPosts, a.reporters, Date.now()),
+        ).bind(a.id, site, a.kind, a.tag, a.flaggedPosts, a.reporters, now),
+      ),
+      // Keep the approved rows' counts current, but never add or remove one.
+      ...candidates.map((a) =>
+        env.DB.prepare(
+          `UPDATE authors SET flagged_posts = ?, distinct_reporters = ?, tag = ?, window_end = ?
+             WHERE author_id = ? AND site = ? AND approved_at IS NOT NULL`,
+        ).bind(a.flaggedPosts, a.reporters, a.tag, now, a.id, site),
       ),
     ];
 

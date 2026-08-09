@@ -6,9 +6,15 @@
  * adapter, never here.
  */
 
-export type SiteId = 'linkedin' | 'reddit';
+/**
+ * The site list is the source of truth and the type is derived from it, not the
+ * other way round. Declaring the union separately meant the schema had to cast
+ * `SITE_IDS` to a loose string tuple, and every value parsed out of the wire
+ * came back as `string` - so a `SiteId` parameter would silently accept "".
+ */
+export const SITE_IDS = ['linkedin', 'reddit'] as const;
 
-export const SITE_IDS: readonly SiteId[] = ['linkedin', 'reddit'];
+export type SiteId = (typeof SITE_IDS)[number];
 
 export type MediaKind = 'image' | 'video' | 'document' | 'link';
 
@@ -88,6 +94,8 @@ export interface Snapshot {
   rulesVersion: number;
   posts: SnapshotPost[];
   authors: SnapshotAuthor[];
+  /** Proof-of-work difficulty this server requires on writes. */
+  stampBits?: number;
 }
 
 export function emptySnapshot(site: SiteId): Snapshot {

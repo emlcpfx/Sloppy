@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ApiError, fetchRuleset, fetchSnapshot, isValidApiBase, normalizeApiBase } from './api.ts';
+import { readFileSync } from 'node:fs';
+
+import { verifyStamp } from '@sloppy/core';
+import { ApiError, fetchRuleset, fetchSnapshot, isValidApiBase, normalizeApiBase, postTag } from './api.ts';
 
 test('https addresses are accepted, with trailing slashes trimmed', () => {
   assert.equal(normalizeApiBase('https://api.example.workers.dev'), 'https://api.example.workers.dev');
@@ -159,4 +162,60 @@ test('the snapshot URL carries nothing a caller can vary but the site', async ()
   } finally {
     globalThis.fetch = original;
   }
+});
+
+test('a tag POST carries a proof-of-work stamp bound to that post', async () => {
+  const captured: { url: string; headers: Headers; body: unknown }[] = [];
+  const original = globalThis.fetch;
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    captured.push({
+      url: String(input),
+      headers: new Headers(init?.headers),
+      body: JSON.parse(String(init?.body)),
+    });
+    return new Response('{"ok":true}', { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+
+  const event = {
+    site: 'linkedin' as const,
+    postId: 'urn:li:activity:1111111111111111111',
+    authorId: 'urn:li:member:9',
+    authorKind: 'person' as const,
+    tag: 'ai-text',
+    textHash: '0123456789abcdef',
+    ts: 1,
+  };
+
+  try {
+    // 10 bits keeps the test quick; the default is 16.
+    await postTag('https://api.example.dev', '11111111-2222-3333-4444-555555555555', event, 10);
+  } finally {
+    globalThis.fetch = original;
+  }
+
+  const seen = captured[0];
+  assert.ok(seen, 'the request should have been made');
+  const stamp = seen.headers.get('x-sloppy-stamp');
+  assert.ok(stamp, 'the stamp must be sent');
+
+  // It verifies for THIS post...
+  assert.equal(
+    verifyStamp(stamp!, { installId: '11111111-2222-3333-4444-555555555555', site: 'linkedin', postId: event.postId }, 10),
+    null,
+  );
+  // ...and not for any other, which is what stops one stamp hiding a thousand posts.
+  assert.equal(
+    verifyStamp(stamp!, { installId: '11111111-2222-3333-4444-555555555555', site: 'linkedin', postId: 'urn:li:activity:2' }, 10),
+    'insufficient-work',
+  );
+});
+
+test('the tag payload is exactly the seven documented fields, and no more', () => {
+  // A chokepoint test: the privacy disclosure names these, and a field added
+  // "just in case" should fail the build rather than ship quietly.
+  const documented = ['site', 'postId', 'authorId', 'authorKind', 'tag', 'textHash', 'installId'];
+  const source = readFileSync(new URL('./api.ts', import.meta.url), 'utf8');
+  const body = source.slice(source.indexOf('body: JSON.stringify({'));
+  const sent = [...body.slice(0, body.indexOf('}),')).matchAll(/^\s{6}(\w+)[,:]/gm)].map((m) => m[1]);
+  assert.deepEqual(sent.sort(), [...documented].sort());
 });

@@ -11,7 +11,8 @@ import { z } from 'zod';
 import { METRIC_NAMES } from './metrics.ts';
 import { SITE_IDS } from './types.ts';
 
-export const zSiteId = z.enum(SITE_IDS as unknown as [string, ...string[]]);
+// Typed from the const tuple, so parsed values keep their literal type.
+export const zSiteId = z.enum(SITE_IDS);
 export const zAuthorKind = z.enum(['person', 'org', 'unknown']);
 
 /** Tags are slugs by the time they hit the wire; see taxonomy.slugifyTag. */
@@ -64,6 +65,14 @@ export const zSnapshot = z.object({
   rulesVersion: z.number().int().nonnegative(),
   posts: z.array(zSnapshotPost).max(50_000),
   authors: z.array(zSnapshotAuthor).max(10_000),
+  /**
+   * Proof-of-work difficulty the server currently requires on writes.
+   *
+   * Carried in the snapshot so it can be raised without a store resubmission -
+   * the same "data over releases" principle as the ruleset. Bounded here so a
+   * hostile server cannot ask a client to mine for a week.
+   */
+  stampBits: z.number().int().min(1).max(24).optional(),
 });
 
 const zRegexFeature = z.object({

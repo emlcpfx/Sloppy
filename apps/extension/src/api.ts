@@ -18,7 +18,7 @@
  * gates CI.
  */
 
-import { sanitizeRuleset } from '@sloppy/core';
+import { DEFAULT_STAMP_BITS, encodeStamp, mintStamp, sanitizeRuleset } from '@sloppy/core';
 import { zRuleset, zSnapshot } from '@sloppy/core/schema';
 import type { Ruleset, SiteId, Snapshot, TagEvent } from '@sloppy/core';
 
@@ -188,10 +188,27 @@ export async function fetchRuleset(apiBase: string): Promise<FetchedRuleset> {
   return { ruleset, dropped };
 }
 
-export async function postTag(apiBase: string, installId: string, event: TagEvent): Promise<void> {
+/**
+ * Send one tag, with a proof-of-work stamp.
+ *
+ * MINTING IS SYNCHRONOUS AND CPU-BOUND, which is exactly why this is only ever
+ * called from the background worker draining the outbound queue - never from a
+ * content script. The feed must not stutter because somebody clicked the splat;
+ * from their side the post is already hidden locally and the upload is
+ * somebody else's problem.
+ */
+export async function postTag(
+  apiBase: string,
+  installId: string,
+  event: TagEvent,
+  stampBits = DEFAULT_STAMP_BITS,
+): Promise<void> {
+  const stamp = mintStamp({ installId, site: event.site, postId: event.postId }, stampBits);
+  if (!stamp) throw new ApiError(`could not mint a stamp at ${stampBits} bits`);
+
   await request(`${base(apiBase)}/tag`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'x-sloppy-stamp': encodeStamp(stamp) },
     body: JSON.stringify({
       site: event.site,
       postId: event.postId,

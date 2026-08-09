@@ -5,3 +5,5 @@ export * from './rules.ts';
 export * from './decide.ts';
 export * from './hash.ts';
 export * from "./pattern-safety.ts";
+export * from "./sha256.ts";
+export * from "./stamp.ts";

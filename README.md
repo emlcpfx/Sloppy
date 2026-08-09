@@ -72,7 +72,7 @@ feed.
 | | |
 |---|---|
 | `pnpm check` | typecheck + unit tests + the ruleset gate |
-| `pnpm test` | 97 unit tests across core, adapters, ruleset, the API boundary and the rollup |
+| `pnpm test` | 112 unit tests across core, adapters, ruleset, the API boundary and the rollup |
 | `pnpm --filter @sloppy/extension test:e2e` | builds, loads into real Chromium, drives the whole loop |
 | `pnpm brand` | regenerate the splat, icons and path data |
 | `pnpm build:all` | Chrome, Firefox and Edge |
@@ -114,11 +114,17 @@ both places; the extension drops unsafe rules individually before storing them.
 Every response from that server is untrusted input: size-capped while reading,
 schema-checked after, and the address must be https.
 
-**Anyone can still write to the shared list.** `POST /tag` is unauthenticated
-and `installId` is a client-generated UUID, so ten requests and two UUIDs can
-promote an author and hide everything they post. It is not exploitable today —
-sharing is off by default and no server is deployed — but it has to be settled
-before P1. Options and a recommendation: [`docs/TRUST.md`](docs/TRUST.md).
+**A report has to cost something, and promoting a person costs a person.**
+`installId` is a client-generated UUID, so the per-install rate limit constrains
+honest clients and nobody else. Every tag now carries a proof-of-work stamp
+bound to that specific post (`packages/core/src/stamp.ts`), which cannot be
+minted once and replayed — roughly 165ms to send one, roughly twenty minutes of
+a core to forge ten thousand. And the nightly rollup no longer promotes anyone:
+it writes candidates, and a human decides with
+`pnpm --filter @sloppy/api authors pending`, because hiding everything an
+account posts is the one action here that can affect somebody's livelihood.
+Rejections are permanent, and there is an appeal route.
+[`docs/TRUST.md`](docs/TRUST.md) · [`docs/APPEALS.md`](docs/APPEALS.md)
 
 **Never `innerHTML`.** LinkedIn enforces Trusted Types. Content scripts are
 currently exempt via the isolated world, but that exemption is not ours to rely
