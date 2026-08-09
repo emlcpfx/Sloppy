@@ -72,7 +72,7 @@ feed.
 | | |
 |---|---|
 | `pnpm check` | typecheck + unit tests + the ruleset gate |
-| `pnpm test` | 79 unit tests across core, adapters, ruleset and the rollup |
+| `pnpm test` | 97 unit tests across core, adapters, ruleset, the API boundary and the rollup |
 | `pnpm --filter @sloppy/extension test:e2e` | builds, loads into real Chromium, drives the whole loop |
 | `pnpm brand` | regenerate the splat, icons and path data |
 | `pnpm build:all` | Chrome, Firefox and Edge |
@@ -103,6 +103,20 @@ stylesheet keys off. Re-injecting the button while leaving the post uncollapsed
 means a hidden post silently pops back into the feed. Also found by the e2e
 test. Every write is guarded by a read first, because setting an attribute to
 the value it already has still fires the observer that scheduled the sweep.
+
+**A CI gate is not a runtime gate.** The ruleset carries regular expressions and
+arrives over the network from an address the user configures — so checking it
+only in CI protects this repository's `rules.json` and nothing anybody executes.
+The safety analysis lives in `packages/core/src/pattern-safety.ts` and runs in
+both places; the extension drops unsafe rules individually before storing them.
+Every response from that server is untrusted input: size-capped while reading,
+schema-checked after, and the address must be https.
+
+**Anyone can still write to the shared list.** `POST /tag` is unauthenticated
+and `installId` is a client-generated UUID, so ten requests and two UUIDs can
+promote an author and hide everything they post. It is not exploitable today —
+sharing is off by default and no server is deployed — but it has to be settled
+before P1. Options and a recommendation: [`docs/TRUST.md`](docs/TRUST.md).
 
 **Never `innerHTML`.** LinkedIn enforces Trusted Types. Content scripts are
 currently exempt via the isolated world, but that exemption is not ours to rely

@@ -100,7 +100,6 @@ async function handleSnapshot(url: URL, env: Env): Promise<Response> {
   const site = url.searchParams.get('site');
   if (!isSiteId(site)) return new Response(JSON.stringify({ error: 'unknown site' }), { status: 400 });
 
-  const since = Math.max(0, Number(url.searchParams.get('since') ?? 0) || 0);
   const cutoff = Date.now() - SNAPSHOT_WINDOW_DAYS * 86_400_000;
 
   const { results } = await env.DB.prepare(
@@ -142,11 +141,14 @@ async function handleSnapshot(url: URL, env: Env): Promise<Response> {
     'access-control-allow-origin': '*',
   });
 
-  // `since` is honoured as a cache key only; the payload is always complete.
-  // A delta protocol would need tombstones for un-tagged posts, and a full
-  // list of ~300 KB is small enough that the complexity buys nothing.
-  if (since > 0) headers.set('x-sloppy-since', String(since));
-
+  // THE URL CARRIES NOTHING A CALLER CAN VARY except the site.
+  //
+  // There used to be a `since` parameter. It was accepted, echoed back in a
+  // header, and never used to filter anything - the payload is always complete,
+  // because a delta protocol would need tombstones for un-tagged posts and a
+  // list this size does not justify that. What it did do was vary the URL, and
+  // the URL is the edge cache key: anyone could bypass the cache and force this
+  // whole rollup to run at the origin, once per request, for free.
   return new Response(JSON.stringify(snapshot), { headers });
 }
 

@@ -111,11 +111,21 @@ export async function installId(): Promise<string> {
  * Deduped per (post, tag) so double-clicking the same chip does not inflate the
  * count that the hide threshold is compared against.
  */
+/**
+ * Ceiling on locally-recorded tags, per site.
+ *
+ * This list was previously unbounded, and it is re-read and re-indexed in every
+ * open tab on every storage change - so left to grow it becomes both a storage
+ * problem and a steadily slower feed. The oldest entries fall off first; a tag
+ * from two years ago is hiding a post nobody will scroll past again.
+ */
+const MAX_LOCAL_TAGS = 5000;
+
 export async function addLocalTag(site: SiteId, tag: LocalTag): Promise<void> {
   const tags = await loadLocalTags(site);
   if (tags.some((t) => t.postId === tag.postId && t.tag === tag.tag)) return;
   tags.push(tag);
-  await write('local', KEYS.localTags(site), tags);
+  await write('local', KEYS.localTags(site), tags.slice(-MAX_LOCAL_TAGS));
   await bumpStat('tagged');
 }
 

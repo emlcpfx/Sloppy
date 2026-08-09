@@ -28,6 +28,17 @@ You turn it on in Settings, and then a tag click sends exactly this:
 
 And periodically it downloads the whole shared list.
 
+### What that adds up to, stated plainly
+
+If sharing is on, the server ends up holding — per install ID — **the set of
+posts you tagged and when you tagged them.** That is a small behavioural record,
+and the install ID lives in `storage.sync`, so it follows you across devices
+signed into the same browser profile.
+
+It is much less than a browsing history, and it only ever covers posts you
+deliberately acted on. But it is not nothing, and "we don't track you" would be
+the wrong summary. Anyone running a server should assume a breach discloses it.
+
 ## What Sloppy never collects
 
 - **Which posts you looked at.** This is the important one, and it is
@@ -85,7 +96,18 @@ adversarial input on an escalating budget. At runtime, patterns compile inside a
 try/catch, stateful flags are stripped, and no pattern is run over more than
 8,000 characters of text.
 
-The gate is `packages/ruleset/validate.ts`. It runs on every push.
+**That gate runs in two places, and the second one is the one that protects
+you.** The analysis lives in `packages/core/src/pattern-safety.ts`. CI runs it
+against this repository's `rules.json` — but the ruleset you actually execute
+arrives over the network, from an address configurable in Settings, so a CI-only
+check would protect the repository and not you. The extension therefore runs the
+same analysis against every ruleset it downloads, before storing it, and drops
+any rule that fails. Rules are dropped individually rather than the whole set
+being rejected, so a single bad rule cannot switch your filtering off.
+
+The API address must be `https` (loopback excepted, for local development).
+Over plain http, anyone on the network path could both read your tags and
+replace the rules that run against your feed.
 
 ## Data retention
 

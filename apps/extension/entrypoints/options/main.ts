@@ -10,6 +10,7 @@
 import '../../src/ui/page.css';
 
 import { CANONICAL_TAGS, SITE_IDS, tagLabel, type SiteId } from '@sloppy/core';
+import { isValidApiBase } from '../../src/api.ts';
 import { sendMessage, write } from '../../src/browser.ts';
 import {
   KEYS,
@@ -168,6 +169,7 @@ async function render(): Promise<void> {
         { class: 'row', style: { marginTop: '10px' } },
         urlInput(settings.apiBase, async (v) => {
           await saveSettings({ ...settings, apiBase: v });
+          void render();
         }),
         h('button', {
           text: 'Sync now',
@@ -181,6 +183,17 @@ async function render(): Promise<void> {
           },
         }),
       ),
+      settings.apiBase && !isValidApiBase(settings.apiBase)
+        ? h('p', {
+            class: 'note',
+            style: { marginTop: '8px', marginBottom: '0', color: 'var(--danger)' },
+            text: 'That address will not be used. It must start with https:// — over plain http, anyone on the network can read your tags and replace the filter list.',
+          })
+        : h('p', {
+            class: 'note',
+            style: { marginTop: '8px', marginBottom: '0' },
+            text: 'Must be https. Rules downloaded from this address are re-checked for unsafe patterns before anything runs.',
+          }),
     ),
 
     h(

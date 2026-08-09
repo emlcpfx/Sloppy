@@ -93,9 +93,7 @@ async function syncAll(): Promise<{ ok: boolean; reason?: string; sites?: number
   let synced = 0;
   for (const site of SITE_IDS) {
     try {
-      const previous = await read<{ generatedAt?: number }>('local', KEYS.snapshot(site), {});
-      const snapshot = await fetchSnapshot(settings.apiBase, site, previous.generatedAt ?? 0);
-      await saveSnapshot(site, snapshot);
+      await saveSnapshot(site, await fetchSnapshot(settings.apiBase, site));
       synced++;
     } catch (err) {
       console.warn(`[sloppy] snapshot sync failed for ${site}`, err);
@@ -103,7 +101,10 @@ async function syncAll(): Promise<{ ok: boolean; reason?: string; sites?: number
   }
 
   try {
-    await saveRuleset(await fetchRuleset(settings.apiBase));
+    // Already sanitised by fetchRuleset - only features that passed the same
+    // safety analysis CI runs are ever stored, let alone compiled.
+    const { ruleset } = await fetchRuleset(settings.apiBase);
+    await saveRuleset(ruleset);
   } catch (err) {
     console.warn('[sloppy] ruleset sync failed', err);
   }

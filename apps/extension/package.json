@@ -15,7 +15,8 @@
     "zip": "wxt zip && wxt zip -b firefox",
     "postinstall": "wxt prepare",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test:e2e": "wxt build && node --test e2e/*.test.mjs"
+    "test:e2e": "wxt build && node --test e2e/*.test.mjs",
+    "test": "node --test src/*.test.ts"
   },
   "dependencies": {
     "@sloppy/adapters": "workspace:*",

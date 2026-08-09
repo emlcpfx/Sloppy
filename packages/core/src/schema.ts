@@ -49,12 +49,21 @@ export const zSnapshotAuthor = z.object({
   reporters: z.number().int().nonnegative(),
 });
 
+/**
+ * Entry caps sized against the real budget, not against what a database could
+ * theoretically hold.
+ *
+ * The plan budgeted roughly 300 KB for 10,000 tags in a rolling 14-day window.
+ * These are five times that, which leaves generous headroom while keeping a
+ * hostile or broken server from filling `storage.local` - the default quota is
+ * about 10 MB, and every content script builds Maps over this in memory.
+ */
 export const zSnapshot = z.object({
   site: zSiteId,
   generatedAt: z.number().int().nonnegative(),
   rulesVersion: z.number().int().nonnegative(),
-  posts: z.array(zSnapshotPost).max(200_000),
-  authors: z.array(zSnapshotAuthor).max(50_000),
+  posts: z.array(zSnapshotPost).max(50_000),
+  authors: z.array(zSnapshotAuthor).max(10_000),
 });
 
 const zRegexFeature = z.object({
