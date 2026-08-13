@@ -138,6 +138,7 @@ test('only feed surfaces are observed', () => {
   assert.equal(li.isFeedUrl(new URL('https://www.linkedin.com/feed/')), true);
   assert.equal(li.isFeedUrl(new URL('https://www.linkedin.com/')), true);
   assert.equal(li.isFeedUrl(new URL('https://www.linkedin.com/feed/update/urn:li:activity:1/')), true);
+  assert.equal(li.isFeedUrl(new URL('https://www.linkedin.com/preload/')), true);
   assert.equal(li.isFeedUrl(new URL('https://www.linkedin.com/messaging/')), false);
   assert.equal(li.isFeedUrl(new URL('https://example.com/feed/')), false);
 });
@@ -214,4 +215,15 @@ test('nested SDUI reshares count as one post', () => {
     </div>
   </div></main>`);
   assert.equal([...li.posts(li.feedRoot()!)].length, 1);
+});
+
+test('an empty SDUI page shell does not steal the feed from the lazy container', () => {
+  mount(`
+    <div data-sdui-screen="com.linkedin.sdui.flagshipnav.feed.Feed"></div>
+    <div componentkey="container-update-list_mainFeed-lazy-container">${SDUI_POST}</div>
+  `);
+  const root = li.feedRoot();
+  assert.ok(root);
+  assert.equal(root.getAttribute('componentkey'), 'container-update-list_mainFeed-lazy-container');
+  assert.equal([...li.posts(root)].length, 1);
 });

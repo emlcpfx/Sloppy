@@ -41,11 +41,24 @@ async function render(): Promise<void> {
   ];
 
   for (const w of health.filter(isBroken)) {
+    const diag = Object.entries(w.diagnostics)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(' · ');
     children.push(
-      h('div', {
-        class: 'banner',
-        text: `${SITE_LABEL[w.site]} markup changed — the feed was found but no posts matched. An update is needed.`,
-      }),
+      h(
+        'div',
+        { class: 'banner' },
+        h('div', {
+          text: `${SITE_LABEL[w.site]} markup changed — the feed was found but no posts matched. An update is needed.`,
+        }),
+        diag
+          ? h('p', {
+              class: 'muted',
+              style: { margin: '6px 0 0', fontSize: '11px' },
+              text: diag,
+            })
+          : false,
+      ),
     );
   }
 

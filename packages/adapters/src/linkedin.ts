@@ -35,16 +35,23 @@ const COMPONENT_KEY_ID = /^(?:expanded)?(.+?)FeedType/;
 
 const feedChain = new SelectorChain('feed', [
   '[data-testid="mainFeed"]',
-  '[data-sdui-screen*="feed.Feed" i]',
+  '[componentkey="container-update-list_mainFeed-lazy-container"]',
+  '[componentkey*="mainFeed-lazy-container"]',
+  '[data-finite-scroll-hotkey-context="FEED"]',
   'main .scaffold-finite-scroll__content',
   'main [role="feed"]',
+  // Demoted: this is often the page shell, not the post list. A match here
+  // with zero posts inside is what trips the "markup changed" banner.
+  '[data-sdui-screen*="feed.Feed" i]',
   'main[role="main"]',
   'main',
 ]);
 
 const postChain = new SelectorChain('post', [
   '[data-view-name="feed-full-update"]',
+  '[componentkey*="FeedType_MAIN_FEED_RELEVANCE"]',
   '[componentkey*="FeedType_MAIN_FEED"]',
+  '[data-view-name*="feed-"][data-view-name*="update"]',
   '[data-urn^="urn:li:activity:"]',
   '[data-id^="urn:li:activity:"]',
   '[data-urn^="urn:li:ugcPost:"]',
@@ -103,12 +110,15 @@ function hasC2PABadge(scope: Element): boolean {
 function isFeedUrl(url: URL): boolean {
   if (!/(^|\.)linkedin\.com$/.test(url.hostname)) return false;
   const p = url.pathname;
-  // Main feed, plus the permalink surface the same post component renders on.
-  return p === '/' || p.startsWith('/feed');
+  // Main feed, permalinks, and the /preload/ A/B of the home feed.
+  return p === '/' || p.startsWith('/feed') || p.startsWith('/preload');
 }
 
 function feedRoot(): Element | null {
-  return feedChain.first(document);
+  // Prefer a container that already has cards, so an empty shell higher in the
+  // chain cannot win. Fall back to the first match while the feed is still
+  // hydrating.
+  return feedChain.firstMatching(document, (el) => postChain.all(el).length > 0) ?? feedChain.first(document);
 }
 
 function posts(root: Element): Element[] {
