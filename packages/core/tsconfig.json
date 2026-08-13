@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Node types are for the TEST files only. Nothing under src/ that ships
+    // imports a node: module - core stays runnable in a content script, a
+    // Worker and a test runner without changing a line.
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"]
+}

@@ -1,0 +1,160 @@
+/**
+ * Shared chrome for the popup and the options page.
+ *
+ * One stylesheet on purpose: on Safari the container app has to do real work to
+ * pass review, and the plan makes that work the options UI loaded in a
+ * WKWebView. That only stays cheap if the popup, the options page and the iOS
+ * app are the same view rather than three.
+ */
+
+:root {
+  --bg: #ffffff;
+  --panel: #f7f8fa;
+  --line: #e3e6ea;
+  --ink: #16181d;
+  --muted: #6b7280;
+  --brand: #4caf34;
+  --brand-deep: #31933a;
+  --danger: #b4342c;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171c;
+    --panel: #1b1e24;
+    --line: #2b3038;
+    --ink: #e6e8ea;
+    --muted: #9aa3ad;
+    --brand: #5fcb37;
+    --brand-deep: #8ade5a;
+    --danger: #e5766c;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+.wrap { padding: 16px; }
+.popup { width: 320px; }
+.options { max-width: 620px; margin: 0 auto; padding: 28px 20px 56px; }
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+header .mark { width: 30px; height: 30px; color: var(--brand); flex: none; }
+header .mark svg { width: 100%; height: 100%; display: block; }
+header h1 { margin: 0; font-size: 19px; font-weight: 650; letter-spacing: -0.015em; }
+header p { margin: 1px 0 0; font-size: 12px; color: var(--muted); }
+
+section {
+  padding: 14px;
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+section > h2 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+section > p.note { margin: 0 0 10px; font-size: 12px; color: var(--muted); }
+
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+}
+
+.field + .field { border-top: 1px solid var(--line); }
+.field label { flex: 1; min-width: 0; }
+.field .sub { display: block; font-size: 12px; color: var(--muted); }
+
+input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--brand); flex: none; }
+input[type='range'] { width: 160px; accent-color: var(--brand); }
+
+input[type='text'],
+input[type='url'] {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+button {
+  padding: 7px 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+button:hover { border-color: var(--brand); }
+button.primary { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
+button.danger { color: var(--danger); }
+button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.tags { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.tag {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tag[data-on='1'] { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 12%, transparent); }
+
+.stats { display: flex; gap: 18px; }
+.stat strong { display: block; font-size: 21px; font-weight: 650; line-height: 1.1; }
+.stat span { font-size: 12px; color: var(--muted); }
+
+.banner {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  border: 1px solid #e6c86a;
+  background: #fdf6e3;
+  color: #6b4e0e;
+  font-size: 13px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .banner { background: #2a2513; border-color: #5c4c1c; color: #e7d089; }
+}
+
+.row { display: flex; gap: 8px; align-items: center; }
+.row > input { flex: 1; }
+.muted { color: var(--muted); font-size: 12px; }
+footer { margin-top: 18px; font-size: 12px; color: var(--muted); }
+footer a { color: inherit; }

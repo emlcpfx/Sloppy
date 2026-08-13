@@ -1,0 +1,18 @@
+{
+  "name": "@sloppy/brand",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The splat, generated from a metaball field rather than drawn.",
+  "exports": {
+    "./splat": "./splat.mjs",
+    "./path": "./generated/splat-path.ts",
+    "./assets/*": "./assets/*"
+  },
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2"
+  }
+}

@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: typecheck, test, ruleset gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Unit tests
+        run: pnpm run test
+
+      # The gate that decides what is allowed into rules.json: restricted
+      # grammar, ReDoS shapes rejected, length capped, every pattern timed
+      # against adversarial input. This is the check the store listing points at.
+      - name: Ruleset gate
+        run: pnpm run lint:rules
+
+      # The splat is generated, so the committed path data must match what the
+      # generator currently produces. A drift here means someone hand-edited a
+      # generated file.
+      - name: Brand assets are current
+        run: |
+          pnpm brand
+          git diff --exit-code -- packages/brand/generated/splat-path.ts
+
+      - name: Build every target
+        run: pnpm --filter @sloppy/extension build:all
+
+  e2e:
+    name: end-to-end in a real browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Loads the built extension into Chromium and drives it against a
+      # fabricated feed. No account, no network, no real person's data.
+      - name: End-to-end
+        run: pnpm --filter @sloppy/extension test:e2e

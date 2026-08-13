@@ -1,0 +1,26 @@
+name = "sloppy-api"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+# The snapshot is edge-cached, so most reads never reach the Worker. That is
+# what keeps this inside the free tier well past the point you would expect.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "sloppy"
+# Fill in after: wrangler d1 create sloppy
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[triggers]
+# Rebuild the author rollup nightly. The window is 90 days and moves slowly;
+# there is nothing to gain from running it more often.
+crons = ["17 4 * * *"]
+
+[vars]
+# Empty means any origin. The extension's background worker fetches from an
+# origin the user configures, so a strict allowlist is opt-in rather than the
+# default.
+ALLOWED_ORIGINS = ""
+
+[observability]
+enabled = true

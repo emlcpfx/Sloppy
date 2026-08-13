@@ -1,0 +1,21 @@
+{
+  "name": "@sloppy/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure scoring, taxonomy and decision logic. No browser APIs, no DOM.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts"
+  },
+  "scripts": {
+    "test": "node --test src/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

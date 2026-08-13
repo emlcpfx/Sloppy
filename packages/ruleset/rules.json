@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "features": [],
+  "threshold": {
+    "default": 5.0,
+    "bySite": {
+      "linkedin": 5.0,
+      "reddit": 6.0
+    }
+  }
+}

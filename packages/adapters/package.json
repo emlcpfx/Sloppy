@@ -1,0 +1,21 @@
+{
+  "name": "@sloppy/adapters",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Per-site DOM knowledge. The only place a selector is allowed to live.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test src/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@sloppy/core": "workspace:*"
+  },
+  "devDependencies": {
+    "linkedom": "^0.18.11",
+    "typescript": "^5.9.3"
+  }
+}

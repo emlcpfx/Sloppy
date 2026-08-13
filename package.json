@@ -1,0 +1,27 @@
+{
+  "name": "sloppy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Community-tagged feed filtering. LinkedIn first, Reddit later, one codebase, $0 hosting.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "scripts": {
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint:rules": "pnpm --filter @sloppy/ruleset validate",
+    "brand": "node packages/brand/build.mjs",
+    "dev": "pnpm --filter @sloppy/extension dev",
+    "build": "pnpm --filter @sloppy/extension build",
+    "build:all": "pnpm --filter @sloppy/extension build:all",
+    "check": "pnpm run typecheck && pnpm run test && pnpm run lint:rules"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/node": "^26.2.0",
+    "playwright": "^1.62.1",
+    "typescript": "^5.9.3"
+  }
+}
