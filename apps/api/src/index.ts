@@ -15,6 +15,9 @@ import {
   CANONICAL_TAGS,
   DEFAULT_STAMP_BITS,
   MAX_STAMP_BITS,
+  IMMUNE_MESSAGE,
+  isImmuneAuthor,
+  isImmunePost,
   normalizeTag,
   SITE_IDS,
   verifyStamp,
@@ -119,6 +122,10 @@ async function handleTag(request: Request, env: Env): Promise<Response> {
   const normalized = normalizeTag(t.tag);
   if (!normalized) return json({ error: 'empty tag' }, request, env, 400);
 
+  if (isImmuneAuthor(t.authorId) || isImmunePost(t.postId)) {
+    return json({ error: 'immune', message: IMMUNE_MESSAGE }, request, env, 403);
+  }
+
   await env.DB.prepare(
     `INSERT INTO tags (post_id, author_id, author_kind, site, tag, install_id, text_hash, ts)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -152,7 +159,7 @@ async function handleSnapshot(url: URL, env: Env): Promise<Response> {
     .bind(site, cutoff)
     .all<TagRow>();
 
-  const rows = results ?? [];
+  const rows = (results ?? []).filter((r) => !isImmuneAuthor(r.author_id) && !isImmunePost(r.post_id));
   const publicTags = new Set([...CANONICAL_TAGS, ...promotableTags(rows, CANONICAL_TAGS)]);
 
   /**
@@ -248,7 +255,11 @@ async function rebuildAuthors(env: Env): Promise<void> {
       .bind(site, cutoff)
       .all<TagRow>();
 
-    const candidates = rollupAuthors(results ?? [], DEFAULT_ROLLUP, now);
+    const candidates = rollupAuthors(
+      (results ?? []).filter((r) => !isImmuneAuthor(r.author_id) && !isImmunePost(r.post_id)),
+      DEFAULT_ROLLUP,
+      now,
+    );
 
     // Rebuild the candidate list rather than upserting it: an author who has
     // aged out of the window must LEAVE, and an incremental update quietly
@@ -293,10 +304,9 @@ async function overRateLimit(env: Env, installId: string): Promise<boolean> {
 /**
  * CORS is REQUIRED here, not optional politeness.
  *
- * The extension's background worker fetches this from an origin the user
- * configures, so it cannot be covered by a static host_permissions entry -
- * which means the request is a genuine cross-origin fetch subject to CORS.
- * Without these headers every sync fails with an opaque network error.
+ * CORS is kept for non-extension clients (curl, a future dashboard) and for
+ * `wrangler dev`. The shipped extension declares host_permissions for the
+ * official origin, so those fetches are not a CORS question.
  */
 function corsHeaders(request: Request, env: Env): Record<string, string> {
   const allow = (env.ALLOWED_ORIGINS ?? '').trim();

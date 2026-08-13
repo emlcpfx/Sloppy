@@ -10,7 +10,6 @@
 import '../../src/ui/page.css';
 
 import { CANONICAL_TAGS, SITE_IDS, tagLabel, type SiteId } from '@sloppy/core';
-import { isValidApiBase } from '../../src/api.ts';
 import { sendMessage, write } from '../../src/browser.ts';
 import {
   KEYS,
@@ -152,7 +151,7 @@ async function render(): Promise<void> {
       h('h2', { text: 'Sharing' }),
       h('p', {
         class: 'note',
-        text: 'Off by default. With it off, every tag stays on this device and nothing is ever sent anywhere. With it on, Sloppy uploads the post id, the author id, the tag and an anonymous install id — never the post text, and never which posts you looked at.',
+        text: 'On by default, so a tag you make can collapse the same post for other people. Turn it off and every tag stays on this device — nothing is ever sent anywhere. With it on, Sloppy uploads the post id, the author id, the tag and an anonymous install id — never the post text, and never which posts you looked at.',
       }),
       h(
         'div',
@@ -167,10 +166,6 @@ async function render(): Promise<void> {
       h(
         'div',
         { class: 'row', style: { marginTop: '10px' } },
-        urlInput(settings.apiBase, async (v) => {
-          await saveSettings({ ...settings, apiBase: v });
-          void render();
-        }),
         h('button', {
           text: 'Sync now',
           on: {
@@ -183,17 +178,11 @@ async function render(): Promise<void> {
           },
         }),
       ),
-      settings.apiBase && !isValidApiBase(settings.apiBase)
-        ? h('p', {
-            class: 'note',
-            style: { marginTop: '8px', marginBottom: '0', color: 'var(--danger)' },
-            text: 'That address will not be used. It must start with https:// — over plain http, anyone on the network can read your tags and replace the filter list.',
-          })
-        : h('p', {
-            class: 'note',
-            style: { marginTop: '8px', marginBottom: '0' },
-            text: 'Must be https. Rules downloaded from this address are re-checked for unsafe patterns before anything runs.',
-          }),
+      h('p', {
+        class: 'note',
+        style: { marginTop: '8px', marginBottom: '0' },
+        text: 'Rules from the shared list are re-checked for unsafe patterns before anything runs.',
+      }),
     ),
 
     h(
@@ -215,7 +204,7 @@ async function render(): Promise<void> {
       h('p', {
         class: 'note',
         style: { marginTop: '8px', marginBottom: '0' },
-        text: 'Accounts are only ever added to the shared repeat-poster list after a person reviews them, and anyone on it can ask to be removed. Individual posts you tag are yours alone unless sharing is on.',
+        text: 'Accounts are only ever added to the shared repeat-poster list after a person reviews them, and anyone on it can ask to be removed. Individual posts you tag go to the shared list while sharing is on; turn it off and they stay on this device.',
       }),
     ),
 
@@ -258,15 +247,6 @@ function range(value: number, onChange: (v: number) => void): HTMLElement {
   const el = h('input', { attrs: { type: 'range', min: '1', max: '10', step: '0.5' } }) as HTMLInputElement;
   el.value = String(value);
   el.addEventListener('change', () => onChange(Number(el.value)));
-  return el;
-}
-
-function urlInput(value: string, onChange: (v: string) => void): HTMLElement {
-  const el = h('input', {
-    attrs: { type: 'url', placeholder: 'https://api.example.workers.dev', spellcheck: 'false' },
-  }) as HTMLInputElement;
-  el.value = value;
-  el.addEventListener('change', () => onChange(el.value.trim()));
   return el;
 }
 

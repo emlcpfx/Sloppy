@@ -169,3 +169,19 @@ test('a snapshot hit beats a rules hit, so the stub names the human reason', () 
   );
   assert.equal(v.action === 'collapse' && v.source, 'post');
 });
+
+test('founder posts never collapse, even with a snapshot hit', () => {
+  const v = decide(
+    post({
+      authorId: 'li:in:ericlevy',
+      postIds: ['urn:li:activity:1111111111111111111'],
+    }),
+    ctx(),
+  );
+  assert.deepEqual(v, { action: 'show' });
+});
+
+test('a known founder activity is immune even without an author id', () => {
+  const v = decide(post({ authorId: null, postIds: ['urn:li:activity:7493503286445273089'] }), ctx());
+  assert.deepEqual(v, { action: 'show' });
+});

@@ -113,6 +113,22 @@ export class SelectorChain {
     return [];
   }
 
+  /**
+   * First candidate that exists AND passes `pred`. Used so a page-shell match
+   * (empty `data-sdui-screen`) does not steal the feed from a later container
+   * that actually has posts.
+   */
+  firstMatching(root: ParentNode, pred: (el: Element) => boolean): Element | null {
+    for (const sel of this.selectors) {
+      const el = root.querySelector(sel);
+      if (el && pred(el)) {
+        this.used = sel;
+        return el;
+      }
+    }
+    return null;
+  }
+
   /** null until something matched; that distinction is the health signal. */
   lastUsed(): string | null {
     return this.used;

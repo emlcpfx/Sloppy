@@ -7,3 +7,4 @@ export * from './hash.ts';
 export * from "./pattern-safety.ts";
 export * from "./sha256.ts";
 export * from "./stamp.ts";
+export * from "./immune.ts";

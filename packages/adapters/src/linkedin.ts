@@ -7,8 +7,10 @@
  * with a fallback, and `diagnostics()` reports which branch actually answered
  * so a breakage surfaces as a bug report instead of a silent uninstall.
  *
- * The SDUI rewrite moved LinkedIn onto semantic attributes, which is the only
- * reason this adapter is viable. Anchor on those; never on a class name alone.
+ * The SDUI rewrite dropped `data-urn` and hashed the class names. One A/B still
+ * exposes `data-view-name="feed-full-update"` / `FeedType_MAIN_FEED_*`. Another
+ * (Aug 2026 home feed) has neither: the only stable hook left on the card is
+ * `data-testid="expandable-text-box"`. Anchor on attributes; never on a class.
  */
 
 import { DEFAULT_POLICY, type AdapterPolicy, type AuthorKind, type MediaRef } from '@sloppy/core';
@@ -23,26 +25,55 @@ import {
 
 const ACTIVITY_PREFIX = 'urn:li:activity:';
 
+/**
+ * Home-feed posts since the Feb 2026 SDUI rewrite carry no `data-urn`. They
+ * are `data-view-name="feed-full-update"` cards whose id lives on `componentkey`
+ * (`expanded{token}FeedType_MAIN_FEED_…`) or on a permalink href. The class
+ * names hashed; these attributes are the ones that survived.
+ */
+const POST_URN = /urn:li:(?:activity|ugcPost|share|aggregatedShare|fsd_update):[A-Za-z0-9_-]+/;
+const PERMALINK_URN = /\/feed\/update\/(urn:li:(?:activity|ugcPost|share):[^/?#]+)/;
+const COMPONENT_KEY_ID = /^(?:expanded)?(.+?)FeedType/;
+
 const feedChain = new SelectorChain('feed', [
   '[data-testid="mainFeed"]',
+  '[componentkey="container-update-list_mainFeed-lazy-container"]',
+  '[componentkey*="mainFeed-lazy-container"]',
+  '[data-finite-scroll-hotkey-context="FEED"]',
   'main .scaffold-finite-scroll__content',
+  'main [role="feed"]',
+  // Demoted: this is often the page shell, not the post list. A match here
+  // with zero posts inside is what trips the "markup changed" banner.
+  '[data-sdui-screen*="feed.Feed" i]',
   'main[role="main"]',
   'main',
 ]);
 
 const postChain = new SelectorChain('post', [
-  `[data-urn^="${ACTIVITY_PREFIX}"]`,
-  `[data-id^="${ACTIVITY_PREFIX}"]`,
+  '[data-view-name="feed-full-update"]',
+  '[componentkey*="FeedType_MAIN_FEED_RELEVANCE"]',
+  '[componentkey*="FeedType_MAIN_FEED"]',
+  '[data-view-name*="feed-"][data-view-name*="update"]',
+  '[data-urn^="urn:li:activity:"]',
+  '[data-id^="urn:li:activity:"]',
+  '[data-urn^="urn:li:ugcPost:"]',
+  '[data-urn^="urn:li:share:"]',
   '.feed-shared-update-v2',
+  '.occludable-update',
 ]);
 
 const actorChain = new SelectorChain('actor', [
+  '[data-view-name="feed-actor-image"]',
   '.update-components-actor',
   '[data-testid*="actor"]',
   '.feed-shared-actor',
+  'a[href*="/in/"]',
+  'a[href*="/company/"]',
 ]);
 
 const textChain = new SelectorChain('text', [
+  '[data-testid="expandable-text-box"]',
+  '[data-view-name="feed-commentary"]',
   '.update-components-text',
   '.feed-shared-inline-show-more-text',
   '.feed-shared-update-v2__description',
@@ -50,6 +81,7 @@ const textChain = new SelectorChain('text', [
 ]);
 
 const mediaChain = new SelectorChain('media', [
+  '[data-view-name="feed-update-image"], [data-view-name="feed-update-video"]',
   '.update-components-image, .update-components-linkedin-video',
   '.feed-shared-image, .feed-shared-linkedin-video',
 ]);
@@ -82,34 +114,79 @@ function hasC2PABadge(scope: Element): boolean {
 function isFeedUrl(url: URL): boolean {
   if (!/(^|\.)linkedin\.com$/.test(url.hostname)) return false;
   const p = url.pathname;
-  // Main feed, plus the permalink surface the same post component renders on.
-  return p === '/' || p.startsWith('/feed');
+  // Main feed, permalinks, and the /preload/ A/B of the home feed.
+  return p === '/' || p.startsWith('/feed') || p.startsWith('/preload');
 }
 
 function feedRoot(): Element | null {
-  return feedChain.first(document);
+  // Prefer a container that already has cards, so an empty shell higher in the
+  // chain cannot win. Fall back to the first match while the feed is still
+  // hydrating.
+  return feedChain.firstMatching(document, (el) => postChain.all(el).length > 0) ?? feedChain.first(document);
 }
 
 function posts(root: Element): Element[] {
-  return postChain.all(root);
+  const found = postChain.all(root);
+  // Nested reshares are the same card. Keep the outermost match; postIds()
+  // still picks up the nested original so a tag on either hides the whole thing.
+  return found.filter((el) => !found.some((other) => other !== el && other.contains(el)));
+}
+
+function permalinkFromLocation(): string | null {
+  try {
+    const href = globalThis.location?.href ?? '';
+    const m = PERMALINK_URN.exec(href);
+    return m?.[1] ? decodeURIComponent(m[1]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function pushUrn(out: string[], raw: string | null | undefined): void {
+  if (!raw) return;
+  const m = POST_URN.exec(raw);
+  if (m && !out.includes(m[0])) out.push(m[0]);
+}
+
+function idFromComponentKey(key: string | null): string | null {
+  if (!key) return null;
+  const m = COMPONENT_KEY_ID.exec(key);
+  const token = m?.[1];
+  if (!token) return null;
+  if (/^\d{10,}$/.test(token)) return `${ACTIVITY_PREFIX}${token}`;
+  return `urn:li:fsd_update:${token}`;
 }
 
 /**
  * Both the outer post and, for a reshare-with-commentary, the original nested
  * inside it. A hit on either collapses, or the same slop walks past every time
  * somebody amplifies it.
+ *
+ * Home-feed SDUI often has no data-urn. Prefer a permalink URN when one exists;
+ * otherwise the componentkey token, which is stable for the life of that row.
  */
 function postIds(el: Element): string[] {
   const out: string[] = [];
-  const push = (v: string | null) => {
-    if (v && v.startsWith(ACTIVITY_PREFIX) && !out.includes(v)) out.push(v);
-  };
 
-  push(el.getAttribute('data-urn'));
-  push(el.getAttribute('data-id'));
-  for (const n of el.querySelectorAll(`[data-urn^="${ACTIVITY_PREFIX}"], [data-id^="${ACTIVITY_PREFIX}"]`)) {
-    push(n.getAttribute('data-urn'));
-    push(n.getAttribute('data-id'));
+  pushUrn(out, permalinkFromLocation());
+  pushUrn(out, el.getAttribute('data-urn'));
+  pushUrn(out, el.getAttribute('data-id'));
+  for (const n of el.querySelectorAll('[data-urn], [data-id]')) {
+    pushUrn(out, n.getAttribute('data-urn'));
+    pushUrn(out, n.getAttribute('data-id'));
+  }
+  for (const a of el.querySelectorAll('a[href*="/feed/update/"]')) {
+    const href = a.getAttribute('href') ?? '';
+    const m = PERMALINK_URN.exec(href);
+    if (m?.[1]) pushUrn(out, decodeURIComponent(m[1]));
+  }
+
+  if (out.length === 0) {
+    const fromSelf = idFromComponentKey(el.getAttribute('componentkey'));
+    const fromClosest = idFromComponentKey(el.closest('[componentkey*="FeedType"]')?.getAttribute('componentkey') ?? null);
+    for (const id of [fromSelf, fromClosest]) {
+      if (id && !out.includes(id)) out.push(id);
+    }
   }
   return out;
 }
@@ -134,7 +211,7 @@ function author(el: Element): AuthorRef {
     if (m) return { id: m[0], kind: kindFromUrn(m[0]), vanity: vanityOf(actor) };
   }
 
-  const vanity = vanityOf(actor);
+  const vanity = vanityOf(actor) ?? vanityOf(el);
   if (!vanity) return { id: null, kind: 'unknown', vanity: null };
   return { id: vanity, kind: vanity.startsWith('li:company:') ? 'org' : 'person', vanity };
 }
@@ -144,8 +221,12 @@ function kindFromUrn(urn: string): AuthorKind {
 }
 
 function vanityOf(actor: Element): string | null {
-  const link = actor.querySelector<HTMLAnchorElement>('a[href*="/in/"], a[href*="/company/"]');
-  const href = link?.getAttribute('href');
+  const hrefOf = (n: Element | null) => n?.getAttribute('href');
+  const selfHref = hrefOf(actor);
+  const link =
+    (selfHref && (selfHref.includes('/in/') || selfHref.includes('/company/')) ? actor : null) ??
+    actor.querySelector<HTMLAnchorElement>('a[href*="/in/"], a[href*="/company/"]');
+  const href = hrefOf(link);
   if (!href) return null;
   const person = /\/in\/([^/?#]+)/.exec(href);
   if (person?.[1]) return `li:in:${decodeURIComponent(person[1])}`;
@@ -213,7 +294,7 @@ export const linkedinAdapter: SiteAdapter = {
   isFeedUrl,
   feedRoot,
   posts,
-  identityAttributes: ['data-urn', 'data-id'],
+  identityAttributes: ['data-urn', 'data-id', 'componentkey'],
   postIds,
   author,
   text,

@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 
 import { verifyStamp } from '@sloppy/core';
 import { ApiError, fetchRuleset, fetchSnapshot, isValidApiBase, normalizeApiBase, postTag } from './api.ts';
+import { resolveApiBase, SHIPPED_API_BASE } from './api-base.ts';
 
 test('https addresses are accepted, with trailing slashes trimmed', () => {
   assert.equal(normalizeApiBase('https://api.example.workers.dev'), 'https://api.example.workers.dev');
@@ -50,10 +51,16 @@ test('empty and malformed addresses are refused', () => {
   assert.throws(() => normalizeApiBase('api.example.dev'), ApiError);
 });
 
-test('isValidApiBase answers without throwing, for the options page', () => {
+test('isValidApiBase answers without throwing', () => {
   assert.equal(isValidApiBase('https://api.example.dev'), true);
   assert.equal(isValidApiBase('http://api.example.dev'), false);
   assert.equal(isValidApiBase(''), false);
+});
+
+test('empty storage resolves to the shipped API, a stored value wins', () => {
+  assert.equal(resolveApiBase(''), SHIPPED_API_BASE);
+  assert.equal(resolveApiBase('   '), SHIPPED_API_BASE);
+  assert.equal(resolveApiBase('http://localhost:8787'), 'http://localhost:8787');
 });
 
 // ---------------------------------------------------------------------------

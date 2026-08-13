@@ -1,5 +1,5 @@
 /**
- * The only code that talks to a server, and it is optional.
+ * The only code that talks to a server.
  *
  * NO PER-POST REQUESTS, EVER. The client pulls the whole blocklist on a timer
  * and matches locally. That is what keeps feed rendering off the network - and,
@@ -9,13 +9,11 @@
  * The only outbound traffic is a tag POST when somebody clicks the splat, and
  * the periodic snapshot pull.
  *
- * EVERY RESPONSE FROM THIS SERVER IS UNTRUSTED INPUT. The address is
- * user-configurable, so "our server" is not a thing this file can assume. A
- * response decides what a person does and does not see, and in the ruleset's
- * case it carries regular expressions that will be executed on every post in
- * their feed. Each fetch is therefore bounded in size, validated against a
- * schema, and - for the ruleset - put through the same safety analysis that
- * gates CI.
+ * EVERY RESPONSE FROM THIS SERVER IS UNTRUSTED INPUT. A compromise of the API
+ * would decide what a person does and does not see, and in the ruleset's case
+ * it carries regular expressions that will be executed on every post in their
+ * feed. Each fetch is therefore bounded in size, validated against a schema,
+ * and - for the ruleset - put through the same safety analysis that gates CI.
  */
 
 import { DEFAULT_STAMP_BITS, encodeStamp, mintStamp, sanitizeRuleset } from '@sloppy/core';
@@ -37,8 +35,7 @@ const MAX_SNAPSHOT_BYTES = 6_000_000;
 const MAX_RULESET_BYTES = 256_000;
 
 /**
- * The API address is typed in by a person, so it gets validated like any other
- * untrusted input.
+ * The API address is untrusted input, even the shipped default.
  *
  * HTTPS or nothing. Over plain http an on-path attacker can read every tag and,
  * worse, substitute the ruleset and the blocklist - deciding what somebody sees
@@ -168,7 +165,7 @@ export interface FetchedRuleset {
  * string is `(a+)+$`, which compiles perfectly and then hangs the tab it runs
  * in. The CI gate catches those in this repository's own rules.json, and this
  * repository's rules.json is not what a user executes: the ruleset arrives over
- * the network, from an address they typed in.
+ * the network from the shared-list API.
  *
  * Unsafe features are DROPPED rather than the whole ruleset rejected, so one
  * bad rule cannot switch filtering off wholesale.

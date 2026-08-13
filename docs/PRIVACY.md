@@ -6,15 +6,16 @@ honest answer to "so what does this thing send?".
 
 ## The short version
 
-**With sharing off — the default — nothing leaves your device. Ever.**
+**Sharing is on by default.** A tag click uploads the post id, the author id,
+the tag, a fingerprint of the text, and an anonymous install id. Turn sharing
+off in Settings and nothing leaves the device.
 
-Sloppy installs with `syncEnabled: false` and no API address configured. In that
-state it makes no network requests at all: tagging a post writes to local
-storage and hides the post for you, and that is the whole loop.
+Sloppy installs with `syncEnabled: true` and talks to the built-in API.
+Turn sharing off in Settings and nothing leaves the device.
 
 ## With sharing on
 
-You turn it on in Settings, and then a tag click sends exactly this:
+A tag click sends exactly this:
 
 | Field | Example | Why |
 |---|---|---|
@@ -78,6 +79,7 @@ nothing private is ever fingerprinted.
 | `alarms` | Wakes the daily snapshot refresh |
 | `*://*.linkedin.com/*` | Read the feed to find posts; draw the button and the stub |
 | `*://*.reddit.com/*` | The same, on Reddit |
+| `https://sloppy-api.eric-0d2.workers.dev/*` | The shared list: upload tags, download the snapshot |
 
 There is no `tabs` permission, no `<all_urls>`, no `declarativeNetRequest`, and
 no remotely-hosted code.
@@ -99,15 +101,14 @@ try/catch, stateful flags are stripped, and no pattern is run over more than
 **That gate runs in two places, and the second one is the one that protects
 you.** The analysis lives in `packages/core/src/pattern-safety.ts`. CI runs it
 against this repository's `rules.json` — but the ruleset you actually execute
-arrives over the network, from an address configurable in Settings, so a CI-only
+arrives over the network from the shared-list API, so a CI-only
 check would protect the repository and not you. The extension therefore runs the
 same analysis against every ruleset it downloads, before storing it, and drops
 any rule that fails. Rules are dropped individually rather than the whole set
 being rejected, so a single bad rule cannot switch your filtering off.
 
-The API address must be `https` (loopback excepted, for local development).
-Over plain http, anyone on the network path could both read your tags and
-replace the rules that run against your feed.
+The API is https. Over plain http, anyone on the network path could both read
+your tags and replace the rules that run against your feed.
 
 ## Data retention
 

@@ -3,9 +3,9 @@
  *
  * THE LOCAL LIST IS NOT A CACHE OF THE REMOTE ONE. Tagging a post writes it to
  * a local list immediately, and that list is merged over the fetched snapshot
- * every time a verdict is computed. That is what lets the whole product run
- * with sync switched off - which is the launch state, because a thing nobody
- * enjoys using locally will not get better by adding a server to it.
+ * every time a verdict is computed. Local hides never wait on the network.
+ * Sharing is on by default so other installs can use the same tags; turning it
+ * off is a real local-only mode, not a degraded one.
  */
 
 import {
@@ -37,7 +37,10 @@ export const KEYS = {
 } as const;
 
 export interface Settings {
-  /** Empty means local-only: nothing is ever sent anywhere. */
+  /**
+   * Override for the shipped API. Empty means use `SHIPPED_API_BASE`.
+   * Not a Settings field — local wrangler and self-host only.
+   */
   apiBase: string;
   syncEnabled: boolean;
   /** Minutes between snapshot pulls. The alarm floor is 1; the plan says daily. */
@@ -52,7 +55,7 @@ export interface Settings {
 export function defaultSettings(): Settings {
   return {
     apiBase: '',
-    syncEnabled: false,
+    syncEnabled: true,
     syncIntervalMinutes: 60 * 24,
     stampBits: DEFAULT_STAMP_BITS,
   };

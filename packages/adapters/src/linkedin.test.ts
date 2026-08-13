@@ -138,6 +138,7 @@ test('only feed surfaces are observed', () => {
   assert.equal(li.isFeedUrl(new URL('https://www.linkedin.com/feed/')), true);
   assert.equal(li.isFeedUrl(new URL('https://www.linkedin.com/')), true);
   assert.equal(li.isFeedUrl(new URL('https://www.linkedin.com/feed/update/urn:li:activity:1/')), true);
+  assert.equal(li.isFeedUrl(new URL('https://www.linkedin.com/preload/')), true);
   assert.equal(li.isFeedUrl(new URL('https://www.linkedin.com/messaging/')), false);
   assert.equal(li.isFeedUrl(new URL('https://example.com/feed/')), false);
 });
@@ -154,4 +155,89 @@ test('featuresFrom produces the shape core expects', () => {
 
 test('LinkedIn propagates on one tag', () => {
   assert.equal(li.policy.postHideThreshold, 1);
+});
+
+const SDUI_POST = `
+  <div data-view-name="feed-full-update" componentkey="expanded7248110011223344555FeedType_MAIN_FEED_RELEVANCE">
+    <a data-view-name="feed-actor-image" href="/in/dana-whitfield"><img alt=""></a>
+    <a href="/in/dana-whitfield"><p>Dana Whitfield</p></a>
+    <span data-testid="expandable-text-box">I fired my best engineer today. Read that again.</span>
+    <a href="/feed/update/urn:li:activity:7248110011223344555/">2h</a>
+    <div data-view-name="feed-update-image"><img src="https://media.licdn.com/x.jpg" width="1024" height="1024"></div>
+  </div>`;
+
+test('SDUI feed cards are posts, even with no data-urn', () => {
+  mount(`<main><div data-testid="mainFeed">${SDUI_POST}</div></main>`);
+  const root = li.feedRoot();
+  assert.ok(root);
+  const found = [...li.posts(root)];
+  assert.equal(found.length, 1);
+  assert.equal(li.diagnostics()['post'], '[data-view-name="feed-full-update"]');
+});
+
+test('SDUI post ids prefer a permalink URN over the componentkey token', () => {
+  mount(`<main><div data-testid="mainFeed">${SDUI_POST}</div></main>`);
+  const el = [...li.posts(li.feedRoot()!)][0]!;
+  assert.deepEqual(li.postIds(el), ['urn:li:activity:7248110011223344555']);
+});
+
+test('SDUI componentkey is the id when no URN is on the card', () => {
+  mount(`<main><div data-testid="mainFeed">
+    <div data-view-name="feed-full-update" componentkey="expandedabcXYZ99FeedType_MAIN_FEED_RELEVANCE">
+      <span data-testid="expandable-text-box">no permalink here</span>
+    </div>
+  </div></main>`);
+  const el = [...li.posts(li.feedRoot()!)][0]!;
+  assert.deepEqual(li.postIds(el), ['urn:li:fsd_update:abcXYZ99']);
+});
+
+test('SDUI actor image href is enough to attribute the author', () => {
+  mount(`<main><div data-testid="mainFeed">${SDUI_POST}</div></main>`);
+  const el = [...li.posts(li.feedRoot()!)][0]!;
+  const a = li.author(el);
+  assert.equal(a.id, 'li:in:dana-whitfield');
+  assert.equal(a.kind, 'person');
+});
+
+test('SDUI body is the expandable text box', () => {
+  mount(`<main><div data-testid="mainFeed">${SDUI_POST}</div></main>`);
+  const el = [...li.posts(li.feedRoot()!)][0]!;
+  assert.equal(li.text(el), 'I fired my best engineer today. Read that again.');
+});
+
+test('nested SDUI reshares count as one post', () => {
+  mount(`<main><div data-testid="mainFeed">
+    <div data-view-name="feed-full-update" componentkey="expandedouterFeedType_MAIN_FEED_RELEVANCE">
+      <span data-testid="expandable-text-box">commentary</span>
+      <div data-view-name="feed-full-update" componentkey="expandedinnerFeedType_MAIN_FEED_RELEVANCE">
+        <span data-testid="expandable-text-box">original</span>
+      </div>
+    </div>
+  </div></main>`);
+  assert.equal([...li.posts(li.feedRoot()!)].length, 1);
+});
+
+test('an empty SDUI page shell does not steal the feed from the lazy container', () => {
+  mount(`
+    <div data-sdui-screen="com.linkedin.sdui.flagshipnav.feed.Feed"></div>
+    <div componentkey="container-update-list_mainFeed-lazy-container">${SDUI_POST}</div>
+  `);
+  const root = li.feedRoot();
+  assert.ok(root);
+  assert.equal(root.getAttribute('componentkey'), 'container-update-list_mainFeed-lazy-container');
+  assert.equal([...li.posts(root)].length, 1);
+});
+
+test('a permalink page contributes the activity URN from the URL', () => {
+  const href = 'https://www.linkedin.com/feed/update/urn:li:activity:7493503286445273089/';
+  const prev = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  Object.defineProperty(globalThis, 'location', { value: { href }, configurable: true });
+  try {
+    mount(`<main><div data-testid="mainFeed">${POST('urn:li:activity:1111111111111111111')}</div></main>`);
+    const el = [...li.posts(li.feedRoot()!)][0]!;
+    assert.ok(li.postIds(el).includes('urn:li:activity:7493503286445273089'));
+  } finally {
+    if (prev) Object.defineProperty(globalThis, 'location', prev);
+    else delete (globalThis as { location?: unknown }).location;
+  }
 });

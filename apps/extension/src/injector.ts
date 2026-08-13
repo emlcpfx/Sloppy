@@ -5,7 +5,7 @@
  * which one it got.
  */
 
-import { decide, fingerprint, type Prefs, type Ruleset, type SiteId, type Verdict } from '@sloppy/core';
+import { decide, fingerprint, immuneMessage, type Prefs, type Ruleset, type SiteId, type Verdict } from '@sloppy/core';
 import { featuresFrom, type SiteAdapter } from '@sloppy/adapters';
 import { onStorageChanged, read, sendMessage, write } from './browser.ts';
 import {
@@ -155,6 +155,12 @@ export function runAdapter(adapter: SiteAdapter): void {
         if (!postId) return;
 
         const author = adapter.author(el);
+        const blocked = immuneMessage(author.id, author.vanity, ...ids);
+        if (blocked) {
+          ui.showImmune(blocked);
+          return;
+        }
+
         const text = adapter.text(el);
 
         await addLocalTag(adapter.id, { postId, authorId: author.id, tag, ts: Date.now() });
