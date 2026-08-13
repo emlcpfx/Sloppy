@@ -37,6 +37,12 @@ export default defineConfig({
         // AMO requires a stable id, and storage.sync needs one on some versions.
         id: 'sloppy@cleanplatefx.com',
         strict_min_version: '115.0',
+        // Required for new AMO listings since Nov 2025. Sharing is off by
+        // default and nothing leaves the device until the user opts in via
+        // Settings, which is our own toggle, not Firefox's consent sheet.
+        data_collection_permissions: {
+          required: ['none'],
+        },
       },
     },
   },

@@ -305,7 +305,7 @@ function corsHeaders(request: Request, env: Env): Record<string, string> {
   return {
     'access-control-allow-origin': allowed,
     'access-control-allow-methods': 'GET, POST, OPTIONS',
-    'access-control-allow-headers': 'content-type',
+    'access-control-allow-headers': 'content-type, x-sloppy-stamp',
     'access-control-max-age': '86400',
   };
 }

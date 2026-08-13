@@ -28,16 +28,17 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const EXTENSION = join(HERE, '..', '.output', 'chrome-mv3');
+const EXTENSION = join(HERE, '..', '.output', 'chrome-mv3').replaceAll('\\', '/');
 
 /**
- * Undefined lets Playwright use the browser it installed itself, which is what
- * CI does. The explicit path is for environments that ship a pre-installed
- * Chromium at a different build number than this Playwright expects.
+ * Full Chrome-for-Testing, never chrome-headless-shell. Headless shell cannot
+ * load extensions, which is why `headless: true` with no executablePath made
+ * every e2e test time out waiting for `[data-sloppy-host]` — locally and in CI.
  */
 const PREINSTALLED = '/opt/pw-browsers/chromium';
 const CHROME =
-  process.env.SLOPPY_CHROME || (existsSync(PREINSTALLED) ? PREINSTALLED : undefined);
+  process.env.SLOPPY_CHROME ||
+  (existsSync(PREINSTALLED) ? PREINSTALLED : chromium.executablePath());
 
 const POST_A = 'urn:li:activity:1111111111111111111';
 const POST_B = 'urn:li:activity:2222222222222222222';
@@ -64,10 +65,12 @@ const FEED_HTML = `<!doctype html>
   </main>
 </body></html>`;
 
-async function launch() {
+async function launch(kind = 'linkedin') {
   const userDataDir = mkdtempSync(join(tmpdir(), 'sloppy-e2e-'));
   const context = await chromium.launchPersistentContext(userDataDir, {
     executablePath: CHROME,
+    // Playwright's default headless path is chrome-headless-shell, which drops
+    // --load-extension on the floor. Full Chrome + new-headless does not.
     headless: true,
     args: [
       `--disable-extensions-except=${EXTENSION}`,
@@ -76,10 +79,15 @@ async function launch() {
     ],
   });
 
-  // Serve the fabricated feed in place of the real site.
-  await context.route('**://*.linkedin.com/**', (route) =>
-    route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: FEED_HTML }),
-  );
+  if (kind === 'linkedin') {
+    await context.route('**://*.linkedin.com/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: FEED_HTML }),
+    );
+  }
+
+  // Content scripts are not registered until the service worker is up. Goto
+  // before that and document_idle has already fired with nobody listening.
+  await extensionId(context);
 
   return { context, userDataDir };
 }
@@ -258,12 +266,7 @@ test('"show anyway" brings a collapsed post back and remembers the decision', as
 });
 
 test('Reddit works through the same engine, with its own policy', async (t) => {
-  const userDataDir = mkdtempSync(join(tmpdir(), 'sloppy-e2e-'));
-  const context = await chromium.launchPersistentContext(userDataDir, {
-    executablePath: CHROME,
-    headless: true,
-    args: [`--disable-extensions-except=${EXTENSION}`, `--load-extension=${EXTENSION}`, '--no-sandbox'],
-  });
+  const { context, userDataDir } = await launch('reddit');
 
   t.after(async () => {
     await context.close();

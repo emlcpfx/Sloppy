@@ -29,8 +29,15 @@ jobs:
         run: pnpm run check
 
       # `zip` also produces the sources archive AMO requires for review.
+      # Stable names (sloppy-chrome.zip / sloppy-firefox.zip) are what the
+      # README download buttons point at via /releases/latest/download/.
       - name: Package
-        run: pnpm --filter @sloppy/extension zip
+        run: |
+          pnpm --filter @sloppy/extension zip
+          cd apps/extension/.output
+          cp sloppyextension-*-chrome.zip sloppy-chrome.zip
+          cp sloppyextension-*-firefox.zip sloppy-firefox.zip
+          cp sloppyextension-*-sources.zip sloppy-sources.zip
 
       - name: Build Edge
         run: pnpm --filter @sloppy/extension build:edge
