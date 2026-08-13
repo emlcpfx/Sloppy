@@ -26,7 +26,7 @@ the useful part if this ever needs revisiting.
 
 ## The original problem
 
-Sharing is off by default and there was no deployed server, so none of this was
+Sharing used to ship off, and there was no deployed server, so none of this was
 ever exploitable in the field. It needed deciding *before* a server existed,
 because the answer is architectural rather than a patch.
 
@@ -80,8 +80,9 @@ manufacture.
 
 **1. Ship local-only. Don't build the shared list.**
 P0 already works and is genuinely useful: your own tags hide your own feed.
-This is the current default and it has no sybil surface at all, because there
-is no server. The cost is that the community-tagging premise never gets tested.
+This is still a supported mode (turn sharing off) and it has no sybil surface at
+all, because there is no server. The cost is that the community-tagging premise
+never gets tested.
 
 **2. Make writes cost something.** A proof-of-work stamp on each tag, or a
 Cloudflare Turnstile token. Turnstile is free, invisible for most people, and

@@ -293,10 +293,9 @@ async function overRateLimit(env: Env, installId: string): Promise<boolean> {
 /**
  * CORS is REQUIRED here, not optional politeness.
  *
- * The extension's background worker fetches this from an origin the user
- * configures, so it cannot be covered by a static host_permissions entry -
- * which means the request is a genuine cross-origin fetch subject to CORS.
- * Without these headers every sync fails with an opaque network error.
+ * CORS is kept for non-extension clients (curl, a future dashboard) and for
+ * `wrangler dev`. The shipped extension declares host_permissions for the
+ * official origin, so those fetches are not a CORS question.
  */
 function corsHeaders(request: Request, env: Env): Record<string, string> {
   const allow = (env.ALLOWED_ORIGINS ?? '').trim();

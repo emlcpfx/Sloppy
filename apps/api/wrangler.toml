@@ -8,8 +8,7 @@ compatibility_date = "2026-08-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "sloppy"
-# Fill in after: wrangler d1 create sloppy
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "0d341987-50cf-4fbe-b661-5905f86429e5"
 
 [triggers]
 # Rebuild the author rollup nightly. The window is 90 days and moves slowly;
@@ -17,9 +16,9 @@ database_id = "REPLACE_WITH_D1_DATABASE_ID"
 crons = ["17 4 * * *"]
 
 [vars]
-# Empty means any origin. The extension's background worker fetches from an
-# origin the user configures, so a strict allowlist is opt-in rather than the
-# default.
+# Empty means any origin. The official extension uses host_permissions for
+# this Worker, so CORS is for wrangler-dev and anything that is not the
+# shipped client.
 ALLOWED_ORIGINS = ""
 
 [observability]

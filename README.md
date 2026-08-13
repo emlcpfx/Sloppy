@@ -25,7 +25,7 @@ Feeds used to be people. A lot of them are now a language model doing LinkedIn v
 
 Sloppy is that mark. It is a filter you operate, not a model that guesses what you should like. Tags describe **form** — AI text, broetry, engagement bait — never whether you agree with the post. Agreement is a weapon; style is a fingerprint.
 
-Your own tags hide the post **for you**, immediately. A shared list is optional and off by default. Until you turn it on, nothing leaves the machine.
+Your own tags hide the post **for you**, immediately. Sharing is on by default so other people can collapse the same posts. Turn it off in Settings and nothing leaves the machine.
 
 ## How it works
 
@@ -35,7 +35,7 @@ Your own tags hide the post **for you**, immediately. A shared list is optional 
 4. The post collapses to a one-line stub with **[show]**. The post is still there. Undo is one click.
 5. That tag is stored locally. The next time the same post shows up, it is already gone.
 
-That is the whole loop. Sharing, when you want it, uploads the tag (post id, author id, a fingerprint of the text — not the text) so other people can benefit. Consensus is per-site on purpose: LinkedIn feeds barely overlap, so one tag is enough to propagate; Reddit waits for three, because one person should not own a thread.
+That is the whole loop. Sharing uploads the tag (post id, author id, a fingerprint of the text — not the text) so other people can benefit. Consensus is per-site on purpose: LinkedIn feeds barely overlap, so one tag is enough to propagate; Reddit waits for three, because one person should not own a thread.
 
 You can always see what was hidden. You can always put it back.
 
@@ -90,7 +90,8 @@ Then Load unpacked on that `chrome-mv3` folder, same as above.
 | `pnpm dev:firefox` | Same, Firefox |
 | `pnpm check` | Typecheck, unit tests, ruleset gate |
 
-The Worker in `apps/api` is only for the shared list. You do not need it, or an account, or a server, to use Sloppy.
+The Worker in `apps/api` is the shared list. Sharing is on by default; turn it
+off in Settings and nothing leaves the machine.
 
 ## Licence
 
@@ -176,12 +177,12 @@ test. Every write is guarded by a read first, because setting an attribute to
 the value it already has still fires the observer that scheduled the sweep.
 
 **A CI gate is not a runtime gate.** The ruleset carries regular expressions and
-arrives over the network from an address the user configures — so checking it
+arrives over the network from the shared-list API — so checking it
 only in CI protects this repository's `rules.json` and nothing anybody executes.
 The safety analysis lives in `packages/core/src/pattern-safety.ts` and runs in
 both places; the extension drops unsafe rules individually before storing them.
 Every response from that server is untrusted input: size-capped while reading,
-schema-checked after, and the address must be https.
+schema-checked after. The address is https.
 
 **A report has to cost something, and promoting a person costs a person.**
 `installId` is a client-generated UUID, so the per-install rate limit constrains
@@ -214,7 +215,7 @@ is a test asserting none have crept in.
 ## Where this stands against the plan
 
 Built: **P0** (LinkedIn adapter, splat button, tag picker, collapse stub, fully
-local), **P1** (Worker + D1 + snapshot sync, off by default), **P2** (author
+local), **P1** (Worker + D1 + snapshot sync, on by default), **P2** (author
 rollup, options page), **P4** (rules interpreter wired, ruleset empty, threshold
 slider), **P5** (Reddit — one adapter file, zero changes to core), and **P6**
 insofar as Firefox and Edge builds are wired.

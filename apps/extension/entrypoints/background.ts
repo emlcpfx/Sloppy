@@ -11,6 +11,7 @@ import { defineBackground } from 'wxt/utils/define-background';
 import { SITE_IDS, type SiteId, type TagEvent } from '@sloppy/core';
 import { alarms, onMessage, read, runtime, write } from '../src/browser.ts';
 import { fetchRuleset, fetchSnapshot, postTag } from '../src/api.ts';
+import { resolveApiBase } from '../src/api-base.ts';
 import { KEYS, installId, loadSettings, saveRuleset, saveSettings, saveSnapshot } from '../src/state.ts';
 
 const ALARM = 'sloppy:sync';
@@ -74,7 +75,7 @@ async function scheduleSync(): Promise<void> {
   } catch {
     // No alarm to clear on a fresh profile.
   }
-  if (!settings.syncEnabled || !settings.apiBase) return;
+  if (!settings.syncEnabled) return;
   alarms.create(ALARM, { periodInMinutes: Math.max(15, settings.syncIntervalMinutes) });
   void syncAll();
 }
@@ -82,20 +83,20 @@ async function scheduleSync(): Promise<void> {
 /**
  * Local-only is a real, supported mode - not a degraded one.
  *
- * With no API configured this returns immediately and the extension keeps
- * working entirely from the local tag list. P0 is meant to be enjoyable before
- * a server exists, so "no server" cannot be an error path.
+ * Turning sharing off skips the network. The extension keeps working entirely
+ * from the local tag list.
  */
 async function syncAll(): Promise<{ ok: boolean; reason?: string; sites?: number }> {
   const settings = await loadSettings();
-  if (!settings.syncEnabled || !settings.apiBase) return { ok: true, reason: 'local-only' };
+  if (!settings.syncEnabled) return { ok: true, reason: 'local-only' };
+  const apiBase = resolveApiBase(settings.apiBase);
 
   let synced = 0;
   let stampBits = settings.stampBits;
 
   for (const site of SITE_IDS) {
     try {
-      const snapshot = await fetchSnapshot(settings.apiBase, site);
+      const snapshot = await fetchSnapshot(apiBase, site);
       await saveSnapshot(site, snapshot);
       if (snapshot.stampBits) stampBits = snapshot.stampBits;
       synced++;
@@ -112,7 +113,7 @@ async function syncAll(): Promise<{ ok: boolean; reason?: string; sites?: number
   try {
     // Already sanitised by fetchRuleset - only features that passed the same
     // safety analysis CI runs are ever stored, let alone compiled.
-    const { ruleset } = await fetchRuleset(settings.apiBase);
+    const { ruleset } = await fetchRuleset(apiBase);
     await saveRuleset(ruleset);
   } catch (err) {
     console.warn('[sloppy] ruleset sync failed', err);
@@ -148,16 +149,17 @@ async function drain(): Promise<void> {
     const queue = await read<QueuedTag[]>('local', KEYS.queue, []);
     if (queue.length === 0) return;
 
-    // Nothing configured to send to: hold the queue rather than dropping it, so
-    // turning sync on later still ships what was tagged in the meantime.
-    if (!settings.syncEnabled || !settings.apiBase) return;
+    // Sharing off: hold the queue rather than dropping it, so turning it back
+    // on still ships what was tagged in the meantime.
+    if (!settings.syncEnabled) return;
 
     const id = await installId();
     const remaining: QueuedTag[] = [];
+    const apiBase = resolveApiBase(settings.apiBase);
 
     for (const item of queue) {
       try {
-        await postTag(settings.apiBase, id, item.event, settings.stampBits);
+        await postTag(apiBase, id, item.event, settings.stampBits);
       } catch {
         const tries = item.tries + 1;
         if (tries < MAX_TRIES) remaining.push({ ...item, tries });
@@ -175,5 +177,5 @@ async function status(): Promise<{ queued: number; syncEnabled: boolean; apiBase
     read<QueuedTag[]>('local', KEYS.queue, []),
     loadSettings(),
   ]);
-  return { queued: queue.length, syncEnabled: settings.syncEnabled, apiBase: settings.apiBase };
+  return { queued: queue.length, syncEnabled: settings.syncEnabled, apiBase: resolveApiBase(settings.apiBase) };
 }

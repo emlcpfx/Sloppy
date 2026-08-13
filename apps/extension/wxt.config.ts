@@ -1,4 +1,5 @@
 import { defineConfig } from 'wxt';
+import { SHIPPED_API_HOST_PERMISSION } from './src/api-base';
 
 /**
  * One config, every target. WXT owns the browser axis; the SiteAdapter owns the
@@ -16,7 +17,7 @@ export default defineConfig({
     // Only what is actually used. Every extra permission is a review question
     // and a scarier install prompt.
     permissions: ['storage', 'alarms'],
-    host_permissions: ['*://*.linkedin.com/*', '*://*.reddit.com/*'],
+    host_permissions: ['*://*.linkedin.com/*', '*://*.reddit.com/*', SHIPPED_API_HOST_PERMISSION],
     icons: {
       16: '/icon/16.png',
       32: '/icon/32.png',
@@ -37,11 +38,11 @@ export default defineConfig({
         // AMO requires a stable id, and storage.sync needs one on some versions.
         id: 'sloppy@cleanplatefx.com',
         strict_min_version: '115.0',
-        // Required for new AMO listings since Nov 2025. Sharing is off by
-        // default and nothing leaves the device until the user opts in via
-        // Settings, which is our own toggle, not Firefox's consent sheet.
+        // Required for new AMO listings since Nov 2025. Sharing is on by
+        // default, so we declare websiteActivity (the post ids you tag).
+        // Settings can still go local-only; that is our toggle, not Firefox's.
         data_collection_permissions: {
-          required: ['none'],
+          required: ['websiteActivity'],
         },
       },
     },

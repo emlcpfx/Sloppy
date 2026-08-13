@@ -48,14 +48,18 @@ jobs:
           path: dist/*.zip
           if-no-files-found: error
 
-      - name: Draft the release
+      - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          draft: false
           files: dist/*.zip
           body: |
             Built from `${{ github.sha }}`.
 
-            Store submissions are still manual on purpose — each one needs its
+            Sharing is on by default. Tags go to the shared list so other
+            installs can collapse the same posts. Turn it off in Settings and
+            nothing leaves the device.
+
+            Store submissions are still manual — each one needs its
             data-collection disclosure checked against what this build actually
             sends. See `docs/PRIVACY.md`.
