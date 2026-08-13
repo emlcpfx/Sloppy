@@ -19,6 +19,7 @@ import type {
   Verdict,
 } from './types.ts';
 import { SHOW } from './types.ts';
+import { isImmuneAuthor, isImmunePost } from './immune.ts';
 
 export interface DecideContext {
   index: SnapshotIndex;
@@ -45,6 +46,7 @@ export function explain(features: PostFeatures, ctx: DecideContext): Explanation
 
   if (!prefs.enabled) return none;
   if (prefs.sites[features.site] === false) return none;
+  if (isImmuneAuthor(features.authorId) || isImmunePost(...features.postIds)) return none;
 
   // 1. Direct post hit. Checked against every id the adapter surfaced, so a
   //    reshare of tagged slop collapses too.

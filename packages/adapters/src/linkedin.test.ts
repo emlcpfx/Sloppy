@@ -227,3 +227,17 @@ test('an empty SDUI page shell does not steal the feed from the lazy container',
   assert.equal(root.getAttribute('componentkey'), 'container-update-list_mainFeed-lazy-container');
   assert.equal([...li.posts(root)].length, 1);
 });
+
+test('a permalink page contributes the activity URN from the URL', () => {
+  const href = 'https://www.linkedin.com/feed/update/urn:li:activity:7493503286445273089/';
+  const prev = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  Object.defineProperty(globalThis, 'location', { value: { href }, configurable: true });
+  try {
+    mount(`<main><div data-testid="mainFeed">${POST('urn:li:activity:1111111111111111111')}</div></main>`);
+    const el = [...li.posts(li.feedRoot()!)][0]!;
+    assert.ok(li.postIds(el).includes('urn:li:activity:7493503286445273089'));
+  } finally {
+    if (prev) Object.defineProperty(globalThis, 'location', prev);
+    else delete (globalThis as { location?: unknown }).location;
+  }
+});

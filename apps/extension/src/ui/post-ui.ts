@@ -36,6 +36,7 @@ export interface PostUI {
   host: HTMLElement;
   render(verdict: Verdict): void;
   closePicker(): void;
+  showImmune(message: string): void;
   destroy(): void;
 }
 
@@ -117,6 +118,22 @@ export function createPostUI(site: SiteId, handlers: PostUIHandlers): PostUI {
     }
   }
 
+  function showImmune(message: string): void {
+    closePicker();
+    const notice = h(
+      'div',
+      { class: 'picker immune', role: 'status' },
+      h('h2', { text: 'Nope' }),
+      h('p', { class: 'immune-copy', text: message }),
+    );
+    wrap.appendChild(notice);
+    setOpen(true);
+    window.setTimeout(() => {
+      notice.remove();
+      setOpen(false);
+    }, 4500);
+  }
+
   function render(verdict: Verdict): void {
     clear(wrap);
     if (picker) picker = null;
@@ -133,6 +150,7 @@ export function createPostUI(site: SiteId, handlers: PostUIHandlers): PostUI {
     host,
     render,
     closePicker,
+    showImmune,
     destroy() {
       closePicker();
       host.remove();

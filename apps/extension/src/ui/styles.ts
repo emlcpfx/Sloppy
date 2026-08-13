@@ -151,6 +151,14 @@ export const SHADOW_CSS = `
 
 .hint { margin: 9px 0 0; font-size: 11px; color: #6b7280; }
 
+.immune-copy {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #1f2328;
+}
+
 /* ---- collapse stub ---- */
 
 .stub {
@@ -194,6 +202,7 @@ export const SHADOW_CSS = `
   .chip:hover { background: #26332a; }
   .row input { background: #24282f; border-color: #343a43; color: #e6e8ea; }
   .hint { color: #9aa3ad; }
+  .immune-copy { color: #e6e8ea; }
   .stub { background: #1b1e24; border-color: #2b3038; color: #9aa3ad; }
   .stub .why b { color: #e6e8ea; }
   .stub button { background: #24282f; border-color: #343a43; color: #e6e8ea; }

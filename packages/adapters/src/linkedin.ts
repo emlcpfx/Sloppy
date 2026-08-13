@@ -7,8 +7,10 @@
  * with a fallback, and `diagnostics()` reports which branch actually answered
  * so a breakage surfaces as a bug report instead of a silent uninstall.
  *
- * The SDUI rewrite moved LinkedIn onto semantic attributes, which is the only
- * reason this adapter is viable. Anchor on those; never on a class name alone.
+ * The SDUI rewrite dropped `data-urn` and hashed the class names. One A/B still
+ * exposes `data-view-name="feed-full-update"` / `FeedType_MAIN_FEED_*`. Another
+ * (Aug 2026 home feed) has neither: the only stable hook left on the card is
+ * `data-testid="expandable-text-box"`. Anchor on attributes; never on a class.
  */
 
 import { DEFAULT_POLICY, type AdapterPolicy, type AuthorKind, type MediaRef } from '@sloppy/core';
@@ -65,6 +67,8 @@ const actorChain = new SelectorChain('actor', [
   '.update-components-actor',
   '[data-testid*="actor"]',
   '.feed-shared-actor',
+  'a[href*="/in/"]',
+  'a[href*="/company/"]',
 ]);
 
 const textChain = new SelectorChain('text', [
@@ -128,6 +132,16 @@ function posts(root: Element): Element[] {
   return found.filter((el) => !found.some((other) => other !== el && other.contains(el)));
 }
 
+function permalinkFromLocation(): string | null {
+  try {
+    const href = globalThis.location?.href ?? '';
+    const m = PERMALINK_URN.exec(href);
+    return m?.[1] ? decodeURIComponent(m[1]) : null;
+  } catch {
+    return null;
+  }
+}
+
 function pushUrn(out: string[], raw: string | null | undefined): void {
   if (!raw) return;
   const m = POST_URN.exec(raw);
@@ -154,6 +168,7 @@ function idFromComponentKey(key: string | null): string | null {
 function postIds(el: Element): string[] {
   const out: string[] = [];
 
+  pushUrn(out, permalinkFromLocation());
   pushUrn(out, el.getAttribute('data-urn'));
   pushUrn(out, el.getAttribute('data-id'));
   for (const n of el.querySelectorAll('[data-urn], [data-id]')) {
