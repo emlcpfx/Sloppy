@@ -1,6 +1,6 @@
 {
   "name": "sloppy",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Community-tagged feed filtering. LinkedIn first, Reddit later, one codebase, $0 hosting.",
   "license": "MIT",

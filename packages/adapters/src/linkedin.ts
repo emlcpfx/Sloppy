@@ -23,26 +23,46 @@ import {
 
 const ACTIVITY_PREFIX = 'urn:li:activity:';
 
+/**
+ * Home-feed posts since the Feb 2026 SDUI rewrite carry no `data-urn`. They
+ * are `data-view-name="feed-full-update"` cards whose id lives on `componentkey`
+ * (`expanded{token}FeedType_MAIN_FEED_…`) or on a permalink href. The class
+ * names hashed; these attributes are the ones that survived.
+ */
+const POST_URN = /urn:li:(?:activity|ugcPost|share|aggregatedShare|fsd_update):[A-Za-z0-9_-]+/;
+const PERMALINK_URN = /\/feed\/update\/(urn:li:(?:activity|ugcPost|share):[^/?#]+)/;
+const COMPONENT_KEY_ID = /^(?:expanded)?(.+?)FeedType/;
+
 const feedChain = new SelectorChain('feed', [
   '[data-testid="mainFeed"]',
+  '[data-sdui-screen*="feed.Feed" i]',
   'main .scaffold-finite-scroll__content',
+  'main [role="feed"]',
   'main[role="main"]',
   'main',
 ]);
 
 const postChain = new SelectorChain('post', [
-  `[data-urn^="${ACTIVITY_PREFIX}"]`,
-  `[data-id^="${ACTIVITY_PREFIX}"]`,
+  '[data-view-name="feed-full-update"]',
+  '[componentkey*="FeedType_MAIN_FEED"]',
+  '[data-urn^="urn:li:activity:"]',
+  '[data-id^="urn:li:activity:"]',
+  '[data-urn^="urn:li:ugcPost:"]',
+  '[data-urn^="urn:li:share:"]',
   '.feed-shared-update-v2',
+  '.occludable-update',
 ]);
 
 const actorChain = new SelectorChain('actor', [
+  '[data-view-name="feed-actor-image"]',
   '.update-components-actor',
   '[data-testid*="actor"]',
   '.feed-shared-actor',
 ]);
 
 const textChain = new SelectorChain('text', [
+  '[data-testid="expandable-text-box"]',
+  '[data-view-name="feed-commentary"]',
   '.update-components-text',
   '.feed-shared-inline-show-more-text',
   '.feed-shared-update-v2__description',
@@ -50,6 +70,7 @@ const textChain = new SelectorChain('text', [
 ]);
 
 const mediaChain = new SelectorChain('media', [
+  '[data-view-name="feed-update-image"], [data-view-name="feed-update-video"]',
   '.update-components-image, .update-components-linkedin-video',
   '.feed-shared-image, .feed-shared-linkedin-video',
 ]);
@@ -91,25 +112,56 @@ function feedRoot(): Element | null {
 }
 
 function posts(root: Element): Element[] {
-  return postChain.all(root);
+  const found = postChain.all(root);
+  // Nested reshares are the same card. Keep the outermost match; postIds()
+  // still picks up the nested original so a tag on either hides the whole thing.
+  return found.filter((el) => !found.some((other) => other !== el && other.contains(el)));
+}
+
+function pushUrn(out: string[], raw: string | null | undefined): void {
+  if (!raw) return;
+  const m = POST_URN.exec(raw);
+  if (m && !out.includes(m[0])) out.push(m[0]);
+}
+
+function idFromComponentKey(key: string | null): string | null {
+  if (!key) return null;
+  const m = COMPONENT_KEY_ID.exec(key);
+  const token = m?.[1];
+  if (!token) return null;
+  if (/^\d{10,}$/.test(token)) return `${ACTIVITY_PREFIX}${token}`;
+  return `urn:li:fsd_update:${token}`;
 }
 
 /**
  * Both the outer post and, for a reshare-with-commentary, the original nested
  * inside it. A hit on either collapses, or the same slop walks past every time
  * somebody amplifies it.
+ *
+ * Home-feed SDUI often has no data-urn. Prefer a permalink URN when one exists;
+ * otherwise the componentkey token, which is stable for the life of that row.
  */
 function postIds(el: Element): string[] {
   const out: string[] = [];
-  const push = (v: string | null) => {
-    if (v && v.startsWith(ACTIVITY_PREFIX) && !out.includes(v)) out.push(v);
-  };
 
-  push(el.getAttribute('data-urn'));
-  push(el.getAttribute('data-id'));
-  for (const n of el.querySelectorAll(`[data-urn^="${ACTIVITY_PREFIX}"], [data-id^="${ACTIVITY_PREFIX}"]`)) {
-    push(n.getAttribute('data-urn'));
-    push(n.getAttribute('data-id'));
+  pushUrn(out, el.getAttribute('data-urn'));
+  pushUrn(out, el.getAttribute('data-id'));
+  for (const n of el.querySelectorAll('[data-urn], [data-id]')) {
+    pushUrn(out, n.getAttribute('data-urn'));
+    pushUrn(out, n.getAttribute('data-id'));
+  }
+  for (const a of el.querySelectorAll('a[href*="/feed/update/"]')) {
+    const href = a.getAttribute('href') ?? '';
+    const m = PERMALINK_URN.exec(href);
+    if (m) pushUrn(out, decodeURIComponent(m[1]));
+  }
+
+  if (out.length === 0) {
+    const fromSelf = idFromComponentKey(el.getAttribute('componentkey'));
+    const fromClosest = idFromComponentKey(el.closest('[componentkey*="FeedType"]')?.getAttribute('componentkey') ?? null);
+    for (const id of [fromSelf, fromClosest]) {
+      if (id && !out.includes(id)) out.push(id);
+    }
   }
   return out;
 }
@@ -134,7 +186,7 @@ function author(el: Element): AuthorRef {
     if (m) return { id: m[0], kind: kindFromUrn(m[0]), vanity: vanityOf(actor) };
   }
 
-  const vanity = vanityOf(actor);
+  const vanity = vanityOf(actor) ?? vanityOf(el);
   if (!vanity) return { id: null, kind: 'unknown', vanity: null };
   return { id: vanity, kind: vanity.startsWith('li:company:') ? 'org' : 'person', vanity };
 }
@@ -144,8 +196,12 @@ function kindFromUrn(urn: string): AuthorKind {
 }
 
 function vanityOf(actor: Element): string | null {
-  const link = actor.querySelector<HTMLAnchorElement>('a[href*="/in/"], a[href*="/company/"]');
-  const href = link?.getAttribute('href');
+  const hrefOf = (n: Element | null) => n?.getAttribute('href');
+  const selfHref = hrefOf(actor);
+  const link =
+    (selfHref && (selfHref.includes('/in/') || selfHref.includes('/company/')) ? actor : null) ??
+    actor.querySelector<HTMLAnchorElement>('a[href*="/in/"], a[href*="/company/"]');
+  const href = hrefOf(link);
   if (!href) return null;
   const person = /\/in\/([^/?#]+)/.exec(href);
   if (person?.[1]) return `li:in:${decodeURIComponent(person[1])}`;
@@ -213,7 +269,7 @@ export const linkedinAdapter: SiteAdapter = {
   isFeedUrl,
   feedRoot,
   posts,
-  identityAttributes: ['data-urn', 'data-id'],
+  identityAttributes: ['data-urn', 'data-id', 'componentkey'],
   postIds,
   author,
   text,
