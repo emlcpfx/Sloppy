@@ -1,6 +1,6 @@
 {
   "name": "@sloppy/extension",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "type": "module",
   "description": "The Sloppy browser extension. The only package that knows a browser exists.",

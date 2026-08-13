@@ -153,7 +153,7 @@ function postIds(el: Element): string[] {
   for (const a of el.querySelectorAll('a[href*="/feed/update/"]')) {
     const href = a.getAttribute('href') ?? '';
     const m = PERMALINK_URN.exec(href);
-    if (m) pushUrn(out, decodeURIComponent(m[1]));
+    if (m?.[1]) pushUrn(out, decodeURIComponent(m[1]));
   }
 
   if (out.length === 0) {
