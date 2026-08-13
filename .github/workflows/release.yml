@@ -28,16 +28,16 @@ jobs:
       - name: Check before shipping
         run: pnpm run check
 
-      # `zip` also produces the sources archive AMO requires for review.
-      # Stable names (sloppy-chrome.zip / sloppy-firefox.zip) are what the
-      # README download buttons point at via /releases/latest/download/.
+      # WXT writes into apps/extension/.output, which is a hidden directory —
+      # upload-artifact and some globs skip it. Copy to dist/ so the README
+      # buttons (/releases/latest/download/sloppy-chrome.zip) keep working.
       - name: Package
         run: |
           pnpm --filter @sloppy/extension zip
-          cd apps/extension/.output
-          cp sloppyextension-*-chrome.zip sloppy-chrome.zip
-          cp sloppyextension-*-firefox.zip sloppy-firefox.zip
-          cp sloppyextension-*-sources.zip sloppy-sources.zip
+          mkdir -p dist
+          cp apps/extension/.output/sloppyextension-*-chrome.zip dist/sloppy-chrome.zip
+          cp apps/extension/.output/sloppyextension-*-firefox.zip dist/sloppy-firefox.zip
+          cp apps/extension/.output/sloppyextension-*-sources.zip dist/sloppy-sources.zip
 
       - name: Build Edge
         run: pnpm --filter @sloppy/extension build:edge
@@ -45,14 +45,14 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: sloppy-${{ github.ref_name }}
-          path: apps/extension/.output/*.zip
+          path: dist/*.zip
           if-no-files-found: error
 
       - name: Draft the release
         uses: softprops/action-gh-release@v2
         with:
           draft: true
-          files: apps/extension/.output/*.zip
+          files: dist/*.zip
           body: |
             Built from `${{ github.sha }}`.
 
